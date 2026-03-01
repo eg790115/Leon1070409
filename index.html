@@ -5,69 +5,43 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>洋洋作息打勾表</title>
     
-    <!-- PWA 配置: 使用更嚴謹的 Manifest 結構 -->
-    <link rel="manifest" href='data:application/manifest+json,{"name":"洋洋作息打勾表","short_name":"洋洋作息","start_url":"./","display":"standalone","background_color":"#f1f5f9","theme_color":"#f97316","icons":[{"src":"https://cdn-icons-png.flaticon.com/512/1426/1426735.png","sizes":"512x512","type":"image/png"}]}'>
+    <!-- PWA 配置 -->
+    <link rel="manifest" href='data:application/manifest+json,{"name":"洋洋作息打勾表","short_name":"洋洋作息","start_url":"index.html","display":"standalone","background_color":"#f1f5f9","theme_color":"#f97316","icons":[{"src":"https://cdn-icons-png.flaticon.com/512/1426/1426735.png","sizes":"512x512","type":"image/png"}]}'>
     
-    <!-- iOS 全螢幕專用設定 -->
+    <!-- iOS 專用標籤 -->
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="洋洋作息">
     <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/1426/1426735.png">
     <meta name="theme-color" content="#f97316">
 
-    <!-- 基礎庫載入 -->
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
 
     <style>
-        /* 徹底鎖定螢幕，移除全域捲軸，達成 App 體驗 */
         body, html {
-            margin: 0;
-            padding: 0;
-            height: 100%;
-            width: 100%;
-            overflow: hidden;
-            background-color: #f1f5f9;
-            user-select: none;
-            -webkit-tap-highlight-color: transparent;
+            margin: 0; padding: 0; height: 100%; width: 100%;
+            overflow: hidden; background-color: #f1f5f9;
+            user-select: none; -webkit-tap-highlight-color: transparent;
             overscroll-behavior: none;
-            position: fixed; /* 防止 iOS 橡皮筋回彈 */
         }
-
-        #root {
-            height: 100%;
-        }
-
-        /* 隱藏所有捲軸 */
-        .no-scrollbar::-webkit-scrollbar {
-            display: none;
-        }
-        .no-scrollbar {
-            -ms-overflow-style: none;
-            scrollbar-width: none;
-        }
-
-        /* 獎盃快速跳動動畫 (0.6s) */
+        #root { height: 100%; }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
         @keyframes bounce-fast {
             0%, 100% { transform: translateY(0) scale(1); }
-            50% { transform: translateY(-15%) scale(1.05); }
+            50% { transform: translateY(-10%) scale(1.03); }
         }
-        .animate-bounce-fast {
-            animation: bounce-fast 0.6s infinite ease-in-out;
-        }
-
-        /* 彩花動畫 */
+        .animate-bounce-fast { animation: bounce-fast 0.6s infinite ease-in-out; }
         @keyframes confetti-fall {
             0% { transform: translateY(-10vh) rotate(0deg); opacity: 1; }
             100% { transform: translateY(110vh) rotate(720deg); opacity: 0; }
         }
-        .animate-confetti-fall {
-            animation: confetti-fall linear infinite;
-        }
-
-        /* 佈局容器 */
+        .animate-confetti-fall { animation: confetti-fall linear infinite; }
+        
+        /* 版面鎖定容器 */
         .app-container {
             height: 100vh;
             display: flex;
@@ -75,6 +49,7 @@
             overflow: hidden;
         }
         
+        /* 主卡片自適應縮合 */
         .main-card {
             flex: 1;
             display: flex;
@@ -82,30 +57,21 @@
             min-height: 0; 
         }
 
-        .scrollable-list {
+        .scrollable-area {
             flex: 1;
             overflow-y: auto;
             -webkit-overflow-scrolling: touch;
         }
+
+        .trophy-glow { filter: drop-shadow(0 0 15px rgba(250, 204, 21, 0.8)); }
     </style>
 </head>
 <body>
     <div id="root"></div>
 
-    <!-- 虛擬 Service Worker 註冊: 滿足 Android PWA 安裝條件 -->
-    <script>
-        if ('serviceWorker' in navigator) {
-            const swCode = "self.addEventListener('fetch', function(e){});";
-            const blob = new Blob([swCode], {type: 'application/javascript'});
-            const url = URL.createObjectURL(blob);
-            navigator.serviceWorker.register(url).catch(err => console.log('SW registration skipped for local preview'));
-        }
-    </script>
-
     <script type="text/babel">
         const { useState, useEffect, useMemo } = React;
 
-        // --- 手動定義 SVG 圖示組件 ---
         const Icon = ({ name, className = "w-6 h-6", style = {}, strokeWidth = 2.5 }) => {
             const icons = {
                 Calendar: <path d="M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z" />,
@@ -121,22 +87,20 @@
                 Heart: <path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z" />,
                 Star: <path d="m12 2 3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />,
                 Sparkles: <path d="m12 3 1.91 5.82L20 10.73l-5.12 3.91L16.79 21 12 17.27 7.21 21l1.91-6.36L4 10.73l6.09-1.91L12 3z" />,
-                GripVertical: <g><circle cx="9" cy="5" r="1"/><circle cx="9" cy="12" r="1"/><circle cx="9" cy="19" r="1"/><circle cx="15" cy="5" r="1"/><circle cx="15" cy="12" r="1"/><circle cx="15" cy="19" r="1"/></g>,
-                Share: <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8M16 6l-4-4-4 4M12 2v13" />
+                GripVertical: <g><circle cx="9" cy="5" r="1"/><circle cx="9" cy="12" r="1"/><circle cx="9" cy="19" r="1"/><circle cx="15" cy="5" r="1"/><circle cx="15" cy="12" r="1"/><circle cx="15" cy="19" r="1"/></g>
             };
             return (
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" className={className} style={style}>{icons[name]}</svg>
             );
         };
 
-        // --- 存儲配置 (IndexedDB + 雙路徑緩存) ---
-        const DB_NAME = 'YangYangRoyal_V50_Final';
+        const DB_NAME = 'YangYangRoyal_V51_Adaptive';
         const STORE_NAME = 'ChecklistData';
         const STORAGE_KEYS = {
-            TASKS: 'yang_v50_tasks',
-            TASKS_BAK: 'yang_v50_tasks_bak',
-            PROGRESS: (day) => `yang_v50_checked_${day}`,
-            PROGRESS_BAK: (day) => `yang_v50_checked_${day}_bak`
+            TASKS: 'yang_v51_tasks',
+            TASKS_BAK: 'yang_v51_tasks_bak',
+            PROGRESS: (day) => `yang_v51_checked_${day}`,
+            PROGRESS_BAK: (day) => `yang_v51_checked_${day}_bak`
         };
 
         const openDB = () => {
@@ -194,14 +158,9 @@
             return (
                 <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[200vmin] h-[200vmin] pointer-events-none z-[-1]"
                      style={{ maskImage: 'radial-gradient(circle, transparent 3.5%, black 12%)', WebkitMaskImage: 'radial-gradient(circle, transparent 3.5%, black 12%)' }}>
-                    <div className="absolute inset-0 animate-[spin_12s_linear_infinite] flex items-center justify-center">
+                    <div className="absolute inset-0 animate-[spin_15s_linear_infinite] flex items-center justify-center">
                         {angles.map(a => (
                             <div key={`g1-${a}`} className="absolute h-full" style={{ transform: `rotate(${a}deg)`, width: '80px', background: `linear-gradient(to top, #FFD700, transparent 50%, #FFD700)`, clipPath: 'polygon(49.5% 50%, 50.5% 50%, 100% 0, 0 0, 49.5% 50%, 50.5% 50%, 100% 100%, 0 100%)', opacity: 0.6 }} />
-                        ))}
-                    </div>
-                    <div className="absolute inset-0 animate-[spin_24s_linear_infinite_reverse] flex items-center justify-center">
-                        {angles.map(a => (
-                            <div key={`g2-${a}`} className="absolute h-full" style={{ transform: `rotate(${a + 36}deg)`, width: '100px', background: `linear-gradient(to top, #FFFDF0, transparent 50%, #FFFDF0)`, clipPath: 'polygon(49.5% 50%, 50.5% 50%, 100% 0, 0 0, 49.5% 50%, 50.5% 50%, 100% 100%, 0 100%)', opacity: 0.5 }} />
                         ))}
                     </div>
                 </div>
@@ -212,11 +171,7 @@
             const [mode, setMode] = useState('kid'); 
             const [realToday] = useState(new Date());
             const realDayOfWeek = useMemo(() => realToday.getDay() || 7, [realToday]);
-            
-            // 修正變數作用域
-            const formattedDate = useMemo(() => {
-                return `${realToday.getFullYear()}年${realToday.getMonth() + 1}月${realToday.getDate()}日`;
-            }, [realToday]);
+            const formattedDate = useMemo(() => `${realToday.getFullYear()}年${realToday.getMonth() + 1}月${realToday.getDate()}日`, [realToday]);
 
             const daysWithDates = useMemo(() => {
                 const monday = new Date(realToday);
@@ -232,9 +187,7 @@
             const [checkedItems, setCheckedItems] = useState({});
             const [allTasks, setAllTasks] = useState([]);
             const [isManageOpen, setIsManageOpen] = useState(false);
-            const [mgmtViewMode, setMgmtViewMode] = useState('list');
             const [deleteConfirmId, setDeleteConfirmId] = useState(null);
-            const [editingTask, setEditingTask] = useState(null);
             const [showCelebration, setShowCelebration] = useState(false);
 
             useEffect(() => {
@@ -319,70 +272,66 @@
                                     />
                                 ))}
                             </div>
-                            <div className="relative flex flex-col items-center justify-center w-full max-w-2xl transform scale-90 sm:scale-100">
-                                <div className="relative flex items-center justify-center mb-10 w-44 md:w-64 h-44 md:h-64 overflow-visible">
+                            <div className="relative flex flex-col items-center justify-center w-full max-w-2xl transform scale-75 sm:scale-100">
+                                <div className="relative flex items-center justify-center mb-6 w-44 md:w-64 h-44 md:h-64 overflow-visible">
                                     <RoyalRays />
                                     <div className="absolute inset-0 bg-yellow-400 blur-[80px] opacity-60 animate-pulse scale-125" />
                                     <Icon name="Crown" className="relative z-[160] w-2/3 h-2/3 text-yellow-400 drop-shadow-[0_0_60px_rgba(250,204,21,1)] animate-bounce" strokeWidth={1.5} />
                                 </div>
-                                <div className="relative z-[160] bg-gradient-to-r from-yellow-300 via-orange-500 to-yellow-300 p-1 rounded-[3.5rem] md:rounded-[4rem] shadow-2xl animate-in slide-in-from-bottom-12 duration-700 w-full max-w-lg">
-                                    <div className="bg-white px-8 py-12 md:py-16 rounded-[3.8rem] flex flex-col items-center overflow-hidden text-center">
-                                        <h2 className="text-4xl sm:text-5xl md:text-7xl font-black italic tracking-tighter bg-clip-text text-transparent bg-gradient-to-b from-yellow-500 via-orange-600 to-yellow-800 mb-4 whitespace-nowrap">任務達成!!</h2>
-                                        <p className="text-slate-400 font-bold text-lg sm:text-xl md:text-2xl tracking-[0.3em] uppercase italic border-t border-slate-100 pt-8 w-full">Mission Accomplished</p>
-                                        <div className="mt-14"><p className="font-black text-sm text-slate-700 uppercase tracking-[0.5em] animate-pulse bg-slate-50 px-6 py-2 rounded-full border border-slate-200">點擊螢幕關閉</p></div>
+                                <div className="relative z-[160] bg-gradient-to-r from-yellow-300 via-orange-500 to-yellow-300 p-1 rounded-[3rem] shadow-2xl">
+                                    <div className="bg-white px-10 py-12 rounded-[2.8rem] flex flex-col items-center overflow-hidden text-center">
+                                        <h2 className="text-4xl sm:text-6xl font-black italic text-orange-600 mb-2 whitespace-nowrap">任務達成!!</h2>
+                                        <p className="text-slate-400 font-bold tracking-widest uppercase">Mission Accomplished</p>
                                     </div>
                                 </div>
                             </div>
                         </div>
                     )}
 
-                    <div className="main-card p-2 md:p-6 lg:p-10 relative overflow-hidden">
+                    <div className="main-card p-1.5 md:p-4 lg:p-6 relative overflow-hidden">
                         
-                        {/* 頂部切換 */}
-                        <div className="flex justify-center mb-4 flex-shrink-0">
-                            <div className="bg-white/80 backdrop-blur-sm p-1.5 rounded-2xl shadow-sm border border-slate-200 flex gap-1 items-center">
+                        {/* 頂部切換: 緊湊型 */}
+                        <div className="flex justify-center mb-2 flex-shrink-0">
+                            <div className="bg-white/80 backdrop-blur-sm p-1 rounded-xl shadow-sm border border-slate-200 flex gap-1 items-center">
                                 <button onClick={() => setMode('kid')}
-                                    className={`flex items-center gap-2 px-8 py-2.5 rounded-xl text-sm font-bold transition-all ${mode === 'kid' ? 'bg-orange-500 text-white shadow-md' : 'text-slate-400 hover:text-orange-300'}`}>
-                                    <Icon name="User" className="w-4 h-4" /> 洋洋國王
+                                    className={`px-6 py-1.5 rounded-lg text-xs font-bold transition-all ${mode === 'kid' ? 'bg-orange-500 text-white shadow-md' : 'text-slate-400 hover:text-orange-300'}`}>
+                                    洋洋模式
                                 </button>
                                 <button onClick={() => setMode('parent')}
-                                    className={`flex items-center gap-2 px-8 py-2.5 rounded-xl text-sm font-bold transition-all ${mode === 'parent' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400 hover:text-indigo-300'}`}>
-                                    <Icon name="ShieldCheck" className="w-4 h-4" /> 皇室管理
+                                    className={`px-6 py-1.5 rounded-lg text-xs font-bold transition-all ${mode === 'parent' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400 hover:text-indigo-300'}`}>
+                                    皇室管理
                                 </button>
                             </div>
                         </div>
 
-                        <div className={`bg-white rounded-[3rem] md:rounded-[4.5rem] shadow-2xl overflow-hidden border-b-[16px] main-card transition-all duration-500 flex flex-col ${mode === 'kid' ? 'border-orange-400' : 'border-indigo-600'}`}>
+                        <div className={`bg-white rounded-[2rem] md:rounded-[3.5rem] shadow-xl overflow-hidden border-b-[10px] main-card transition-all duration-500 flex flex-col ${mode === 'kid' ? 'border-orange-400' : 'border-indigo-600'}`}>
                             
-                            {/* Header: 固定 */}
-                            <div className={`px-8 py-8 md:px-14 md:py-12 text-white relative flex-shrink-0 transition-colors duration-1000 ${mode === 'kid' ? 'bg-gradient-to-br from-orange-400 via-rose-400 to-rose-500 shadow-inner' : 'bg-gradient-to-br from-indigo-600 to-blue-700'}`}>
-                                <div className="flex justify-between items-start mb-6">
-                                   <div className="bg-white/20 backdrop-blur-xl border border-white/30 px-8 py-4 rounded-[2.2rem] shadow-lg flex items-center gap-4 mx-auto md:mx-0">
-                                      <Icon name="Calendar" className="w-10 h-10 opacity-70" />
-                                      <h2 className="text-3xl sm:text-5xl md:text-7xl font-black tracking-tighter drop-shadow-md">
-                                        {formattedDate}
-                                      </h2>
+                            {/* Header: 高度自適應 */}
+                            <div className={`px-6 py-4 md:px-10 md:py-8 text-white relative flex-shrink-0 transition-colors duration-1000 ${mode === 'kid' ? 'bg-gradient-to-br from-orange-400 via-rose-400 to-rose-500 shadow-inner' : 'bg-gradient-to-br from-indigo-600 to-blue-700'}`}>
+                                <div className="flex justify-between items-start mb-4">
+                                   <div className="bg-white/20 backdrop-blur-md border border-white/30 px-5 py-2 rounded-2xl shadow-lg flex items-center gap-3">
+                                      <Icon name="Calendar" className="w-6 h-6 opacity-70" />
+                                      <h2 className="text-xl sm:text-2xl md:text-3xl font-black tracking-tighter drop-shadow-md">{formattedDate}</h2>
                                    </div>
                                 </div>
                                 
-                                <div className="flex flex-col md:flex-row items-center gap-10 md:gap-14 text-center md:text-left">
-                                    <div className="flex-1 overflow-visible">
-                                        <h1 className="text-5xl sm:text-7xl md:text-9xl font-black drop-shadow-md tracking-tighter leading-tight mb-8">洋洋，加油！</h1>
-                                        <div className="flex flex-wrap justify-center md:justify-start">
-                                            <p className="text-lg sm:text-2xl md:text-3xl font-bold bg-black/15 px-10 py-5 rounded-3xl inline-flex items-center gap-4 backdrop-blur-sm shadow-inner">
-                                                {progress === 100 && currentTasks.length > 0 ? <><Icon name="Sparkles" className="w-8 h-8 text-yellow-300" /> 王者的完美達成！</> : `今日任務：${completedCount} / ${currentTasks.length}`}
-                                            </p>
-                                        </div>
+                                <div className="flex flex-row items-center justify-between gap-4">
+                                    <div className="flex-1">
+                                        <h1 className="text-3xl sm:text-5xl md:text-7xl font-black drop-shadow-md tracking-tighter leading-tight mb-3">洋洋，加油！</h1>
+                                        <p className="text-sm sm:text-lg md:text-xl font-bold bg-black/10 px-6 py-2 rounded-2xl inline-flex items-center gap-2 backdrop-blur-sm shadow-inner">
+                                            {progress === 100 && currentTasks.length > 0 ? "🏆 完美的王者表現！" : `任務：${completedCount}/${currentTasks.length}`}
+                                        </p>
                                     </div>
                                     
-                                    <div className="flex-shrink-0 w-40 h-40 md:w-64 md:h-64 aspect-square flex items-center justify-center bg-white/10 rounded-full border-[10px] border-white/20 shadow-2xl backdrop-blur-md relative overflow-hidden group">
+                                    {/* 圓環大小適應螢幕 */}
+                                    <div className="flex-shrink-0 w-28 h-28 sm:w-36 sm:h-36 md:w-48 md:h-48 aspect-square flex items-center justify-center bg-white/10 rounded-full border-[6px] border-white/20 shadow-xl backdrop-blur-md relative overflow-hidden group">
                                         {progress === 100 ? (
                                             <div className="relative animate-in zoom-in duration-500 flex items-center justify-center w-full h-full p-[22%] overflow-visible">
-                                                <Icon name="Trophy" className="w-full h-full drop-shadow-[0_0_25px_rgba(250, 204, 21, 0.8)] animate-bounce-fast" style={{ color: dynamicColor }} />
+                                                <Icon name="Trophy" className="w-full h-full trophy-glow animate-bounce-fast" style={{ color: dynamicColor }} />
                                             </div>
                                         ) : (
-                                            <span className="text-5xl md:text-8xl font-black z-10 text-white drop-shadow-md tracking-tighter">
-                                                {progress}<span className="text-xl md:text-4xl ml-1 opacity-70">%</span>
+                                            <span className="text-3xl sm:text-5xl md:text-7xl font-black z-10 text-white drop-shadow-md tracking-tighter">
+                                                {progress}<span className="text-sm sm:text-xl ml-0.5 opacity-70">%</span>
                                             </span>
                                         )}
                                         <svg className="absolute inset-0 w-full h-full -rotate-90 p-0" viewBox="0 0 100 100">
@@ -393,103 +342,97 @@
                                 </div>
                             </div>
 
-                            {/* 星期導航: 固定並放大日期 */}
-                            <div className="flex justify-around px-4 py-6 md:px-10 md:py-10 bg-white border-b border-slate-50 overflow-x-auto no-scrollbar gap-2 md:gap-6 flex-shrink-0">
+                            {/* 星期導航: 縮小高度 */}
+                            <div className="flex justify-around px-4 py-3 md:px-10 md:py-6 bg-white border-b border-slate-50 no-scrollbar gap-1 flex-shrink-0">
                                 {daysWithDates.map((day) => (
                                     <button key={day.id} onClick={() => setSelectedDay(day.id)}
-                                        className={`flex-shrink-0 w-22 h-24 md:w-36 md:h-44 rounded-[2rem] md:rounded-[3.5rem] flex flex-col items-center justify-center transition-all duration-300 ${
-                                            selectedDay === day.id ? (mode === 'kid' ? 'bg-orange-500 text-white shadow-2xl scale-110' : 'bg-indigo-600 text-white shadow-2xl scale-110') : 'text-slate-300 hover:bg-slate-50'
+                                        className={`flex-shrink-0 w-16 h-18 sm:w-20 sm:h-24 md:w-32 md:h-36 rounded-2xl md:rounded-[2.5rem] flex flex-col items-center justify-center transition-all duration-300 ${
+                                            selectedDay === day.id ? (mode === 'kid' ? 'bg-orange-500 text-white shadow-lg scale-105' : 'bg-indigo-600 text-white shadow-lg scale-105') : 'text-slate-300 hover:bg-slate-50'
                                         }`}>
-                                        <span className={`text-[20px] md:text-[28px] font-black mb-2 opacity-90 ${selectedDay === day.id ? 'text-white' : 'text-slate-500'}`}>
+                                        <span className={`text-[12px] md:text-[22px] font-black mb-1 opacity-90 ${selectedDay === day.id ? 'text-white' : 'text-slate-500'}`}>
                                             {day.dateStr}
                                         </span>
-                                        <span className="text-3xl md:text-5xl font-black tracking-tighter">{day.label}</span>
-                                        {day.id === realDayOfWeek && <div className={`w-3 h-3 rounded-full mt-3 ${selectedDay === day.id ? 'bg-white' : 'bg-orange-400'}`} />}
+                                        <span className="text-xl md:text-4xl font-black tracking-tighter">{day.label}</span>
+                                        {day.id === realDayOfWeek && <div className={`w-2 h-2 rounded-full mt-1.5 ${selectedDay === day.id ? 'bg-white' : 'bg-orange-400'}`} />}
                                     </button>
                                 ))}
                             </div>
 
-                            {/* 任務清單區: 獨立滑動，隱藏捲軸 */}
-                            <div className="scrollable-list no-scrollbar p-6 md:p-14 touch-pan-y">
+                            {/* 任務清單區: 雙欄排列 + 緊湊卡片 */}
+                            <div className="scrollable-area no-scrollbar p-3 md:p-8 touch-pan-y bg-slate-50/50">
                                 {!isManageOpen && (
-                                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 md:gap-12">
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-6">
                                         {currentTasks.length > 0 ? (
                                             currentTasks.map((task) => (
                                                 <div key={task.id} onClick={() => toggleItem(task.id)}
-                                                    className={`group flex items-center gap-6 p-10 rounded-[4rem] border-4 transition-all active:scale-[0.97] duration-300 ${
-                                                        checkedItems[task.id] ? 'bg-emerald-50 border-emerald-300 shadow-inner' : (mode === 'kid' && selectedDay !== (realToday.getDay() || 7)) ? 'bg-slate-50 border-transparent opacity-30 cursor-not-allowed' : 'bg-white border-slate-100 shadow-sm hover:border-orange-200 cursor-pointer'
+                                                    className={`group flex items-center gap-4 p-5 md:p-8 rounded-[2rem] md:rounded-[3rem] border-2 transition-all active:scale-[0.98] duration-300 ${
+                                                        checkedItems[task.id] ? 'bg-emerald-50 border-emerald-200' : (mode === 'kid' && selectedDay !== realDayOfWeek) ? 'bg-slate-50 border-transparent opacity-30 cursor-not-allowed' : 'bg-white border-slate-100 shadow-sm hover:border-orange-100 cursor-pointer'
                                                     }`}
                                                 >
                                                     <div className="flex-shrink-0 relative">
                                                         {checkedItems[task.id] ? (
-                                                            <div className="bg-emerald-500 rounded-[2.5rem] p-7 shadow-2xl shadow-emerald-200">
-                                                                <Icon name="CheckCircle2" className="w-12 h-12 text-white" />
-                                                            </div>
+                                                            <div className="bg-emerald-500 rounded-2xl p-4 shadow-lg"><Icon name="CheckCircle2" className="w-8 h-8 text-white" /></div>
                                                         ) : (
-                                                            <div className={`w-24 h-24 rounded-[2.5rem] border-[14px] transition-all duration-300 ${mode === 'kid' ? 'border-orange-50 group-hover:border-orange-200' : 'border-indigo-50'}`} />
+                                                            <div className={`w-14 h-14 rounded-2xl border-[8px] transition-all duration-300 ${mode === 'kid' ? 'border-orange-50' : 'border-indigo-50'}`} />
                                                         )}
-                                                        {checkedItems[task.id] && <div className="absolute -top-6 -right-6"><Icon name="Star" className="w-14 h-14 text-yellow-400 fill-yellow-400 animate-spin" /></div>}
                                                     </div>
                                                     <div className="flex-1 overflow-hidden text-left">
-                                                       <span className={`text-[14px] px-5 py-2 rounded-full font-black uppercase mb-4 inline-block shadow-sm ${
-                                                        task.cat === '每天' ? 'bg-orange-100 text-orange-600' : task.cat === '平日' ? 'bg-blue-100 text-blue-600' : task.cat === '葛洛莉' ? 'bg-emerald-100 text-emerald-600' : task.cat === '週末' ? 'bg-purple-100 text-purple-600' : 'bg-slate-100 text-slate-600'
-                                                      }`}>{task.cat || '日常'}</span>
-                                                      <p className={`text-2xl sm:text-4xl md:text-5xl font-black leading-tight tracking-tighter text-slate-800 break-words ${checkedItems[task.id] ? 'opacity-25 italic' : ''}`}>
+                                                       <span className={`text-[10px] px-3 py-1 rounded-full font-black uppercase mb-1.5 inline-block ${
+                                                        task.cat === '每天' ? 'bg-orange-100 text-orange-600' : task.cat === '平日' ? 'bg-blue-100 text-blue-600' : task.cat === '葛洛莉' ? 'bg-emerald-100 text-emerald-600' : task.cat === '周末' ? 'bg-purple-100 text-purple-600' : 'bg-slate-100 text-slate-500'
+                                                      }`}>{task.cat}</span>
+                                                      <p className={`text-base sm:text-xl md:text-3xl font-black leading-snug tracking-tighter text-slate-800 break-words ${checkedItems[task.id] ? 'opacity-20 italic' : ''}`}>
                                                         {task.title}
                                                       </p>
                                                     </div>
                                                 </div>
                                             ))
                                         ) : (
-                                            <div className="col-span-full py-40 text-center animate-in fade-in zoom-in duration-1000 opacity-40">
-                                                <Icon name="Heart" className="w-24 h-24 text-yellow-500 mx-auto mb-10 animate-pulse" />
-                                                <h3 className="text-4xl font-black text-slate-300 italic tracking-tighter leading-tight text-center">今日暫無任務，休息萬歲！🏖️</h3>
+                                            <div className="col-span-full py-16 text-center opacity-30">
+                                                <Icon name="Heart" className="w-16 h-16 text-yellow-500 mx-auto mb-4 animate-pulse" />
+                                                <h3 className="text-2xl font-black tracking-tighter text-center">今日休息萬歲！🏖️</h3>
                                             </div>
                                         )}
                                     </div>
                                 )}
 
                                 {mode === 'parent' && (
-                                    <div className="space-y-12">
-                                        <div className="flex flex-col sm:flex-row justify-between items-center bg-indigo-50 p-12 rounded-[4rem] border border-indigo-100 gap-8 shadow-sm">
-                                            <div className="flex items-center gap-6 text-indigo-900 font-black text-4xl italic">
-                                                <Icon name="Settings2" className="w-12 h-12 text-indigo-400" /> 王者系統設定
+                                    <div className="space-y-6">
+                                        <div className="flex justify-between items-center bg-indigo-50 p-6 rounded-3xl border border-indigo-100 shadow-sm">
+                                            <div className="flex items-center gap-3 text-indigo-900 font-black text-xl italic">
+                                                <Icon name="Settings2" className="w-8 h-8 text-indigo-400" /> 皇室設定
                                             </div>
-                                            <button onClick={() => {setIsManageOpen(!isManageOpen); setDeleteConfirmId(null);}} className="bg-indigo-600 text-white px-16 py-5 rounded-[2rem] font-black shadow-2xl hover:bg-indigo-700 active:scale-95 transition-all text-2xl">
-                                                {isManageOpen ? '完成設定' : '開始修改清單'}
+                                            <button onClick={() => {setIsManageOpen(!isManageOpen); setDeleteConfirmId(null);}} className="bg-indigo-600 text-white px-8 py-2.5 rounded-xl font-black shadow-lg hover:bg-indigo-700 transition-all text-sm">
+                                                {isManageOpen ? '完成設定' : '修改清單'}
                                             </button>
                                         </div>
 
                                         {isManageOpen && (
-                                            <div className="space-y-12">
-                                                <button onClick={addTask} className="w-full py-16 border-4 border-dashed border-indigo-100 rounded-[4rem] text-indigo-400 font-black text-3xl hover:bg-indigo-50 flex items-center justify-center gap-6 transition-all">
-                                                    <Icon name="Plus" className="w-12 h-12" /> 新增一個王者作息項目
+                                            <div className="space-y-4">
+                                                <button onClick={addTask} className="w-full py-8 border-2 border-dashed border-indigo-200 rounded-3xl text-indigo-400 font-black text-lg hover:bg-indigo-50 flex items-center justify-center gap-4 transition-all">
+                                                    <Icon name="Plus" className="w-8 h-8" /> 新增一個王者作息
                                                 </button>
-                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
+                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                                     {allTasks.map((task) => (
-                                                        <div key={task.id} className="bg-white border-2 border-slate-100 p-12 rounded-[4rem] shadow-sm flex flex-col group relative overflow-visible">
+                                                        <div key={task.id} className="bg-white border border-slate-100 p-6 rounded-[2rem] shadow-sm flex flex-col group relative overflow-hidden">
                                                             {deleteConfirmId === task.id && (
-                                                                <div className="absolute inset-0 bg-red-600/95 z-10 flex flex-col items-center justify-center p-12 text-white animate-in zoom-in duration-300 rounded-[4rem]">
-                                                                    <p className="font-black text-3xl mb-8 text-center">確定刪除此任務？</p>
-                                                                    <div className="flex gap-8 w-full px-12 text-center justify-center">
-                                                                        <button onClick={() => confirmRemoveTask(task.id)} className="flex-1 bg-white text-red-600 py-4 rounded-2xl font-black shadow-xl active:scale-95 transition-all">刪除</button>
-                                                                        <button onClick={() => setDeleteConfirmId(null)} className="flex-1 bg-red-800 text-white py-5 rounded-2xl font-black border border-red-400 active:scale-95 transition-all text-sm text-center">取消</button>
+                                                                <div className="absolute inset-0 bg-red-600/95 z-10 flex flex-col items-center justify-center p-4 text-white rounded-[2rem]">
+                                                                    <p className="font-black text-lg mb-4">確定刪除？</p>
+                                                                    <div className="flex gap-4 w-full px-6 justify-center">
+                                                                        <button onClick={() => confirmRemoveTask(task.id)} className="flex-1 bg-white text-red-600 py-2 rounded-xl font-black shadow-xl">刪除</button>
+                                                                        <button onClick={() => setDeleteConfirmId(null)} className="flex-1 bg-red-800 text-white py-2 rounded-xl font-black border border-red-400">取消</button>
                                                                     </div>
                                                                 </div>
                                                             )}
-                                                            <div className="flex items-start gap-6 mb-10 text-left">
-                                                                <div className="mt-4 cursor-grab active:cursor-grabbing text-slate-200 group-hover:text-indigo-400"><Icon name="GripVertical" className="w-10 h-10" /></div>
-                                                                <div className="flex-1 text-left">
-                                                                    <input value={task.title} onChange={(e) => updateTask(task.id, 'title', e.target.value)} className="w-full text-4xl font-black bg-slate-50 border-none rounded-2xl px-8 py-5 outline-none focus:ring-4 ring-indigo-50 text-left" />
+                                                            <div className="flex items-start gap-3 mb-6">
+                                                                <div className="flex-1">
+                                                                    <input value={task.title} onChange={(e) => updateTask(task.id, 'title', e.target.value)} className="w-full text-xl font-black bg-slate-50 border-none rounded-xl px-4 py-2 outline-none focus:ring-2 ring-indigo-200 text-left" />
                                                                 </div>
-                                                                <button onClick={() => setDeleteConfirmId(task.id)} className="p-5 text-slate-100 hover:text-red-500 rounded-3xl transition-all"><Icon name="Trash2" className="w-8 h-8" /></button>
+                                                                <button onClick={() => setDeleteConfirmId(task.id)} className="p-3 text-slate-200 hover:text-red-500 transition-all"><Icon name="Trash2" className="w-6 h-6" /></button>
                                                             </div>
-                                                            <div className="flex items-center gap-4 px-10 text-center justify-center">
-                                                                <div className="flex wrap gap-3 overflow-visible text-center">
-                                                                    {baseDays.map(d => (
-                                                                        <button key={d.id} onClick={() => toggleTaskRule(task.id, d.id)} className={`w-14 h-14 rounded-2xl text-lg font-black transition-all ${task.rule.includes(d.id) ? 'bg-indigo-600 text-white shadow-md scale-110' : 'bg-slate-50 text-slate-300 hover:bg-slate-100'}`}>{d.label}</button>
-                                                                    ))}
-                                                                </div>
+                                                            <div className="flex wrap gap-1.5 justify-center">
+                                                                {baseDays.map(d => (
+                                                                    <button key={d.id} onClick={() => toggleTaskRule(task.id, d.id)} className={`w-9 h-9 rounded-xl text-xs font-black transition-all ${task.rule.includes(d.id) ? 'bg-indigo-600 text-white shadow-md' : 'bg-slate-50 text-slate-300 hover:bg-slate-100'}`}>{d.label}</button>
+                                                                ))}
                                                             </div>
                                                         </div>
                                                     ))}
@@ -500,35 +443,14 @@
                                 )}
                             </div>
 
-                            {/* Footer */}
-                            <div className="py-12 bg-slate-50 border-t border-slate-100 flex justify-center items-center flex-shrink-0 text-center text-center">
-                                <div className="flex items-center gap-6 text-[14px] font-black text-slate-300 tracking-[0.7em] uppercase opacity-60 text-center">
-                                   YANG YANG ROYAL v50.0
+                            {/* Footer: 緊湊型 */}
+                            <div className="py-4 bg-slate-50 border-t border-slate-100 flex justify-center items-center flex-shrink-0">
+                                <div className="flex items-center gap-6 text-[10px] font-black text-slate-300 tracking-[0.6em] uppercase opacity-60 text-center">
+                                   YANG YANG ROYAL v51.0
                                 </div>
                             </div>
                         </div>
                     </div>
-
-                    {/* 編輯彈窗 */}
-                    {editingTask && (
-                        <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-xl z-[200] flex items-center justify-center p-6 animate-in fade-in duration-300 text-center" onClick={() => setEditingTask(null)}>
-                            <div className="bg-white rounded-[5.5rem] shadow-2xl w-full max-w-xl overflow-hidden border-b-[35px] border-indigo-600" onClick={e => e.stopPropagation()}>
-                                <div className="bg-indigo-600 p-14 text-white flex justify-between items-center shadow-lg">
-                                    <h2 className="text-4xl font-black flex items-center gap-6 justify-center w-full"><Icon name="Crown" className="w-14 h-14 text-yellow-300" /> 皇家修改</h2>
-                                    <button onClick={() => setEditingTask(null)} className="bg-white/20 p-6 rounded-[2rem] hover:bg-white/40 transition-all"><Icon name="X" className="w-12 h-12" /></button>
-                                </div>
-                                <div className="p-16 space-y-16 flex flex-col items-center text-center">
-                                    <input value={editingTask.title} onChange={(e) => updateTask(editingTask.id, 'title', e.target.value)} className="w-full text-5xl font-black bg-slate-50 border-none rounded-[3.5rem] px-12 py-12 outline-none focus:ring-12 ring-indigo-50 transition-all text-center" />
-                                    <div className="flex justify-between gap-5 overflow-visible px-4 w-full text-center">
-                                        {baseDays.map(d => (
-                                            <button key={d.id} onClick={() => toggleTaskRule(editingTask.id, d.id)} className={`flex-1 min-w-[4.5rem] h-24 rounded-[2rem] text-4xl font-black transition-all ${editingTask.rule.includes(d.id) ? 'bg-indigo-600 text-white shadow-2xl scale-110' : 'bg-slate-100 text-slate-300'}`}>{d.label}</button>
-                                        ))}
-                                    </div>
-                                    <button onClick={() => setEditingTask(null)} className="w-full bg-indigo-600 text-white py-10 rounded-[3.5rem] font-black shadow-2xl active:scale-95 transition-all text-4xl hover:bg-indigo-700">完成設定</button>
-                                </div>
-                            </div>
-                        </div>
-                    )}
                 </div>
             );
         };
