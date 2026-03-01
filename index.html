@@ -5,53 +5,107 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>洋洋作息打勾表</title>
     
-    <!-- PWA 配置 -->
-    <link rel="manifest" href='data:application/manifest+json,{"name":"洋洋作息打勾表","short_name":"洋洋作息","start_url":"index.html","display":"standalone","background_color":"#f1f5f9","theme_color":"#f97316","icons":[{"src":"https://cdn-icons-png.flaticon.com/512/1426/1426735.png","sizes":"512x512","type":"image/png"}]}'>
+    <!-- PWA 配置: 使用更嚴謹的 Manifest 結構 -->
+    <link rel="manifest" href='data:application/manifest+json,{"name":"洋洋作息打勾表","short_name":"洋洋作息","start_url":"./","display":"standalone","background_color":"#f1f5f9","theme_color":"#f97316","icons":[{"src":"https://cdn-icons-png.flaticon.com/512/1426/1426735.png","sizes":"512x512","type":"image/png"}]}'>
     
-    <!-- iOS 專用標籤 (手動加入主畫面後仍可全螢幕) -->
+    <!-- iOS 全螢幕專用設定 -->
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="洋洋作息">
     <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/1426/1426735.png">
     <meta name="theme-color" content="#f97316">
 
+    <!-- 基礎庫載入 -->
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
 
     <style>
+        /* 徹底鎖定螢幕，移除全域捲軸，達成 App 體驗 */
         body, html {
-            margin: 0; padding: 0; height: 100%; width: 100%;
-            overflow: hidden; background-color: #f1f5f9;
-            user-select: none; -webkit-tap-highlight-color: transparent;
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            width: 100%;
+            overflow: hidden;
+            background-color: #f1f5f9;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
             overscroll-behavior: none;
+            position: fixed; /* 防止 iOS 橡皮筋回彈 */
         }
-        #root { height: 100%; }
-        .no-scrollbar::-webkit-scrollbar { display: none; }
-        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+        #root {
+            height: 100%;
+        }
+
+        /* 隱藏所有捲軸 */
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .no-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+
+        /* 獎盃快速跳動動畫 (0.6s) */
         @keyframes bounce-fast {
             0%, 100% { transform: translateY(0) scale(1); }
             50% { transform: translateY(-15%) scale(1.05); }
         }
-        .animate-bounce-fast { animation: bounce-fast 0.6s infinite ease-in-out; }
+        .animate-bounce-fast {
+            animation: bounce-fast 0.6s infinite ease-in-out;
+        }
+
+        /* 彩花動畫 */
         @keyframes confetti-fall {
             0% { transform: translateY(-10vh) rotate(0deg); opacity: 1; }
             100% { transform: translateY(110vh) rotate(720deg); opacity: 0; }
         }
-        .animate-confetti-fall { animation: confetti-fall linear infinite; }
-        .app-container { height: 100vh; display: flex; flex-direction: column; }
-        .scrollable-list { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; }
-        .trophy-glow { filter: drop-shadow(0 0 15px rgba(250, 204, 21, 0.8)); }
+        .animate-confetti-fall {
+            animation: confetti-fall linear infinite;
+        }
+
+        /* 佈局容器 */
+        .app-container {
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        
+        .main-card {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            min-height: 0; 
+        }
+
+        .scrollable-list {
+            flex: 1;
+            overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
+        }
     </style>
 </head>
 <body>
     <div id="root"></div>
 
+    <!-- 虛擬 Service Worker 註冊: 滿足 Android PWA 安裝條件 -->
+    <script>
+        if ('serviceWorker' in navigator) {
+            const swCode = "self.addEventListener('fetch', function(e){});";
+            const blob = new Blob([swCode], {type: 'application/javascript'});
+            const url = URL.createObjectURL(blob);
+            navigator.serviceWorker.register(url).catch(err => console.log('SW registration skipped for local preview'));
+        }
+    </script>
+
     <script type="text/babel">
         const { useState, useEffect, useMemo } = React;
 
-        // --- 手動定義 SVG 圖示組件 (移除下載圖示) ---
+        // --- 手動定義 SVG 圖示組件 ---
         const Icon = ({ name, className = "w-6 h-6", style = {}, strokeWidth = 2.5 }) => {
             const icons = {
                 Calendar: <path d="M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z" />,
@@ -67,21 +121,22 @@
                 Heart: <path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z" />,
                 Star: <path d="m12 2 3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />,
                 Sparkles: <path d="m12 3 1.91 5.82L20 10.73l-5.12 3.91L16.79 21 12 17.27 7.21 21l1.91-6.36L4 10.73l6.09-1.91L12 3z" />,
-                GripVertical: <g><circle cx="9" cy="5" r="1"/><circle cx="9" cy="12" r="1"/><circle cx="9" cy="19" r="1"/><circle cx="15" cy="5" r="1"/><circle cx="15" cy="12" r="1"/><circle cx="15" cy="19" r="1"/></g>
+                GripVertical: <g><circle cx="9" cy="5" r="1"/><circle cx="9" cy="12" r="1"/><circle cx="9" cy="19" r="1"/><circle cx="15" cy="5" r="1"/><circle cx="15" cy="12" r="1"/><circle cx="15" cy="19" r="1"/></g>,
+                Share: <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8M16 6l-4-4-4 4M12 2v13" />
             };
             return (
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" className={className} style={style}>{icons[name]}</svg>
             );
         };
 
-        // --- 存儲配置 ---
-        const DB_NAME = 'YangYangRoyal_V49_Clean';
+        // --- 存儲配置 (IndexedDB + 雙路徑緩存) ---
+        const DB_NAME = 'YangYangRoyal_V50_Final';
         const STORE_NAME = 'ChecklistData';
         const STORAGE_KEYS = {
-            TASKS: 'yang_v49_tasks',
-            TASKS_BAK: 'yang_v49_tasks_bak',
-            PROGRESS: (day) => `yang_v49_checked_${day}`,
-            PROGRESS_BAK: (day) => `yang_v49_checked_${day}_bak`
+            TASKS: 'yang_v50_tasks',
+            TASKS_BAK: 'yang_v50_tasks_bak',
+            PROGRESS: (day) => `yang_v50_checked_${day}`,
+            PROGRESS_BAK: (day) => `yang_v50_checked_${day}_bak`
         };
 
         const openDB = () => {
@@ -157,7 +212,11 @@
             const [mode, setMode] = useState('kid'); 
             const [realToday] = useState(new Date());
             const realDayOfWeek = useMemo(() => realToday.getDay() || 7, [realToday]);
-            const formattedDate = useMemo(() => `${realToday.getFullYear()}年${realToday.getMonth() + 1}月${realToday.getDate()}日`, [realToday]);
+            
+            // 修正變數作用域
+            const formattedDate = useMemo(() => {
+                return `${realToday.getFullYear()}年${realToday.getMonth() + 1}月${realToday.getDate()}日`;
+            }, [realToday]);
 
             const daysWithDates = useMemo(() => {
                 const monday = new Date(realToday);
@@ -277,14 +336,14 @@
                         </div>
                     )}
 
-                    <div className="main-content p-2 md:p-6 lg:p-10 relative overflow-hidden">
+                    <div className="main-card p-2 md:p-6 lg:p-10 relative overflow-hidden">
                         
-                        {/* 頂部切換 (已刪除下載按鈕) */}
+                        {/* 頂部切換 */}
                         <div className="flex justify-center mb-4 flex-shrink-0">
-                            <div className="bg-white/80 backdrop-blur-sm p-1 rounded-2xl shadow-sm border border-slate-200 flex gap-1 items-center">
+                            <div className="bg-white/80 backdrop-blur-sm p-1.5 rounded-2xl shadow-sm border border-slate-200 flex gap-1 items-center">
                                 <button onClick={() => setMode('kid')}
                                     className={`flex items-center gap-2 px-8 py-2.5 rounded-xl text-sm font-bold transition-all ${mode === 'kid' ? 'bg-orange-500 text-white shadow-md' : 'text-slate-400 hover:text-orange-300'}`}>
-                                    <Icon name="User" className="w-4 h-4" /> 洋洋模式
+                                    <Icon name="User" className="w-4 h-4" /> 洋洋國王
                                 </button>
                                 <button onClick={() => setMode('parent')}
                                     className={`flex items-center gap-2 px-8 py-2.5 rounded-xl text-sm font-bold transition-all ${mode === 'parent' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400 hover:text-indigo-300'}`}>
@@ -295,9 +354,9 @@
 
                         <div className={`bg-white rounded-[3rem] md:rounded-[4.5rem] shadow-2xl overflow-hidden border-b-[16px] main-card transition-all duration-500 flex flex-col ${mode === 'kid' ? 'border-orange-400' : 'border-indigo-600'}`}>
                             
-                            {/* Header */}
+                            {/* Header: 固定 */}
                             <div className={`px-8 py-8 md:px-14 md:py-12 text-white relative flex-shrink-0 transition-colors duration-1000 ${mode === 'kid' ? 'bg-gradient-to-br from-orange-400 via-rose-400 to-rose-500 shadow-inner' : 'bg-gradient-to-br from-indigo-600 to-blue-700'}`}>
-                                <div className="flex justify-between items-start mb-6 text-center">
+                                <div className="flex justify-between items-start mb-6">
                                    <div className="bg-white/20 backdrop-blur-xl border border-white/30 px-8 py-4 rounded-[2.2rem] shadow-lg flex items-center gap-4 mx-auto md:mx-0">
                                       <Icon name="Calendar" className="w-10 h-10 opacity-70" />
                                       <h2 className="text-3xl sm:text-5xl md:text-7xl font-black tracking-tighter drop-shadow-md">
@@ -319,7 +378,7 @@
                                     <div className="flex-shrink-0 w-40 h-40 md:w-64 md:h-64 aspect-square flex items-center justify-center bg-white/10 rounded-full border-[10px] border-white/20 shadow-2xl backdrop-blur-md relative overflow-hidden group">
                                         {progress === 100 ? (
                                             <div className="relative animate-in zoom-in duration-500 flex items-center justify-center w-full h-full p-[22%] overflow-visible">
-                                                <Icon name="Trophy" className="w-full h-full trophy-glow animate-bounce-fast" style={{ color: dynamicColor }} />
+                                                <Icon name="Trophy" className="w-full h-full drop-shadow-[0_0_25px_rgba(250, 204, 21, 0.8)] animate-bounce-fast" style={{ color: dynamicColor }} />
                                             </div>
                                         ) : (
                                             <span className="text-5xl md:text-8xl font-black z-10 text-white drop-shadow-md tracking-tighter">
@@ -334,7 +393,7 @@
                                 </div>
                             </div>
 
-                            {/* 星期導航 */}
+                            {/* 星期導航: 固定並放大日期 */}
                             <div className="flex justify-around px-4 py-6 md:px-10 md:py-10 bg-white border-b border-slate-50 overflow-x-auto no-scrollbar gap-2 md:gap-6 flex-shrink-0">
                                 {daysWithDates.map((day) => (
                                     <button key={day.id} onClick={() => setSelectedDay(day.id)}
@@ -350,7 +409,7 @@
                                 ))}
                             </div>
 
-                            {/* 任務清單區 */}
+                            {/* 任務清單區: 獨立滑動，隱藏捲軸 */}
                             <div className="scrollable-list no-scrollbar p-6 md:p-14 touch-pan-y">
                                 {!isManageOpen && (
                                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 md:gap-12">
@@ -375,14 +434,14 @@
                                                        <span className={`text-[14px] px-5 py-2 rounded-full font-black uppercase mb-4 inline-block shadow-sm ${
                                                         task.cat === '每天' ? 'bg-orange-100 text-orange-600' : task.cat === '平日' ? 'bg-blue-100 text-blue-600' : task.cat === '葛洛莉' ? 'bg-emerald-100 text-emerald-600' : task.cat === '週末' ? 'bg-purple-100 text-purple-600' : 'bg-slate-100 text-slate-600'
                                                       }`}>{task.cat || '日常'}</span>
-                                                      <p className={`text-2xl sm:text-3xl md:text-5xl font-black leading-tight tracking-tighter text-slate-800 break-words ${checkedItems[task.id] ? 'opacity-25 italic' : ''}`}>
+                                                      <p className={`text-2xl sm:text-4xl md:text-5xl font-black leading-tight tracking-tighter text-slate-800 break-words ${checkedItems[task.id] ? 'opacity-25 italic' : ''}`}>
                                                         {task.title}
                                                       </p>
                                                     </div>
                                                 </div>
                                             ))
                                         ) : (
-                                            <div className="col-span-full py-40 text-center opacity-40">
+                                            <div className="col-span-full py-40 text-center animate-in fade-in zoom-in duration-1000 opacity-40">
                                                 <Icon name="Heart" className="w-24 h-24 text-yellow-500 mx-auto mb-10 animate-pulse" />
                                                 <h3 className="text-4xl font-black text-slate-300 italic tracking-tighter leading-tight text-center">今日暫無任務，休息萬歲！🏖️</h3>
                                             </div>
@@ -444,7 +503,7 @@
                             {/* Footer */}
                             <div className="py-12 bg-slate-50 border-t border-slate-100 flex justify-center items-center flex-shrink-0 text-center text-center">
                                 <div className="flex items-center gap-6 text-[14px] font-black text-slate-300 tracking-[0.7em] uppercase opacity-60 text-center">
-                                   YANG YANG ROYAL v49.0
+                                   YANG YANG ROYAL v50.0
                                 </div>
                             </div>
                         </div>
