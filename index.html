@@ -5,22 +5,51 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>洋洋作息打勾表</title>
     
-    <!-- PWA 配置 -->
-    <link rel="manifest" href='data:application/manifest+json,{"name":"洋洋作息打勾表","short_name":"洋洋作息","start_url":"index.html","display":"standalone","background_color":"#f1f5f9","theme_color":"#f97316","icons":[{"src":"https://cdn-icons-png.flaticon.com/512/1426/1426735.png","sizes":"512x512","type":"image/png"}]}'>
-    
-    <!-- iOS 專用標籤 -->
+    <!-- 解決安卓/小米平板 PWA 全螢幕與安裝問題的專用標籤 -->
+    <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-touch-fullscreen" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="洋洋作息">
-    <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/1426/1426735.png">
     <meta name="theme-color" content="#f97316">
+    <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/1426/1426735.png">
 
+    <!-- 動態產生 PWA Manifest 繞過部分平板的嚴格限制 -->
+    <link id="manifest-link" rel="manifest">
+    <script>
+      (function() {
+        var manifest = {
+          "name": "洋洋作息打勾表",
+          "short_name": "洋洋作息",
+          "start_url": ".",
+          "display": "standalone",
+          "display_override": ["fullscreen", "standalone"],
+          "background_color": "#f1f5f9",
+          "theme_color": "#f97316",
+          "icons": [
+            {
+              "src": "https://cdn-icons-png.flaticon.com/512/1426/1426735.png",
+              "sizes": "512x512",
+              "type": "image/png",
+              "purpose": "any maskable"
+            }
+          ]
+        };
+        var blob = new Blob([JSON.stringify(manifest)], { type: 'application/manifest+json' });
+        document.getElementById('manifest-link').href = URL.createObjectURL(blob);
+      })();
+    </script>
+
+    <!-- 載入 React、Tailwind 與 自動佈局動畫引擎 -->
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- 引入 AutoAnimate 來達成「圖卡被推擠開」的流暢特效 -->
+    <script src="https://cdn.jsdelivr.net/npm/@formkit/auto-animate@0.8.2/index.global.js"></script>
 
     <style>
+        /* 鎖定螢幕，達成全適應 App 體驗 */
         body, html {
             margin: 0; padding: 0; height: 100%; width: 100%;
             overflow: hidden; background-color: #f1f5f9;
@@ -28,99 +57,132 @@
             overscroll-behavior: none;
         }
         #root { height: 100%; }
+        
+        /* 隱藏捲軸但保留捲動 */
         .no-scrollbar::-webkit-scrollbar { display: none; }
         .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        
+        /* 動畫 */
         @keyframes bounce-fast {
             0%, 100% { transform: translateY(0) scale(1); }
-            50% { transform: translateY(-10%) scale(1.03); }
+            50% { transform: translateY(-10%) scale(1.05); }
         }
         .animate-bounce-fast { animation: bounce-fast 0.6s infinite ease-in-out; }
+        
         @keyframes confetti-fall {
             0% { transform: translateY(-10vh) rotate(0deg); opacity: 1; }
             100% { transform: translateY(110vh) rotate(720deg); opacity: 0; }
         }
         .animate-confetti-fall { animation: confetti-fall linear infinite; }
+
+        /* 純 CSS 旋轉光芒 */
+        .sunburst-rays {
+            background: repeating-conic-gradient(from 0deg, #FFD700 0deg 18deg, #FFFFFF 18deg 36deg);
+            mask-image: radial-gradient(circle, transparent 15%, black 65%);
+            -webkit-mask-image: radial-gradient(circle, transparent 15%, black 65%);
+        }
         
-        /* 版面鎖定容器 */
+        /* 佈局容器 */
         .app-container {
-            height: 100vh;
-            display: flex;
-            flex-direction: column;
-            overflow: hidden;
+            height: 100vh; display: flex; flex-direction: column; overflow: hidden;
         }
-        
-        /* 主卡片自適應縮合 */
         .main-card {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-            min-height: 0; 
+            flex: 1; display: flex; flex-direction: column; min-height: 0; 
         }
-
         .scrollable-area {
-            flex: 1;
-            overflow-y: auto;
-            -webkit-overflow-scrolling: touch;
+            flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch;
         }
-
         .trophy-glow { filter: drop-shadow(0 0 15px rgba(250, 204, 21, 0.8)); }
+        
+        /* 確保拖曳順暢，防止網頁反白或滾動干擾 */
+        .touch-none { touch-action: none; }
+        .drag-active { cursor: grabbing !important; }
     </style>
 </head>
 <body>
     <div id="root"></div>
 
     <script type="text/babel">
-        const { useState, useEffect, useMemo } = React;
+        const { useState, useEffect, useMemo, useRef } = React;
+
+        const ICONS_DATA = {
+            Calendar: <path d="M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z" />,
+            Trophy: <path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6M18 9h1.5a2.5 2.5 0 0 0 0-5H18M4 22h16M10 14.66V17c0 .55.47.98.97 1.21C12.23 18.8 13.77 18.8 15.03 18.21c.5-.23.97-.66.97-1.21v-2.34M12 6v8M12 6c-3.31 0-6 2.69-6 6s2.69 6 6 6 6-2.69 6-6-2.69-6-6-6z" />,
+            Crown: <path d="m2 4 3 12h14l3-12-6 7-4-7-4 7-6-7z" />,
+            CheckCircle2: <path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10zM9 12l2 2 4-4" />,
+            Plus: <path d="M12 5v14M5 12h14" />,
+            Trash2: <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M10 11v6M14 11v6" />,
+            Settings2: <path d="M20 7h-9M14 17H5M17 12H7M7 2h0M7 22h0M17 2h0M17 22h0M7 7a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM17 12a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM7 17a3 3 0 1 0 0 6 3 3 0 0 0 0-6z" />,
+            User: <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2M12 3a4 4 0 1 0 0 8 4 4 0 0 0 0-8z" />,
+            ShieldCheck: <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10zM9 12l2 2 4-4" />,
+            X: <path d="M18 6 6 18M6 6l12 12" />,
+            Heart: <path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z" />,
+            Star: <path d="m12 2 3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />,
+            Sparkles: <path d="m12 3 1.91 5.82L20 10.73l-5.12 3.91L16.79 21 12 17.27 7.21 21l1.91-6.36L4 10.73l6.09-1.91L12 3z" />,
+            GripVertical: <g><circle cx="9" cy="5" r="1.5"/><circle cx="9" cy="12" r="1.5"/><circle cx="9" cy="19" r="1.5"/><circle cx="15" cy="5" r="1.5"/><circle cx="15" cy="12" r="1.5"/><circle cx="15" cy="19" r="1.5"/></g>,
+        };
 
         const Icon = ({ name, className = "w-6 h-6", style = {}, strokeWidth = 2.5 }) => {
-            const icons = {
-                Calendar: <path d="M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z" />,
-                Trophy: <path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6M18 9h1.5a2.5 2.5 0 0 0 0-5H18M4 22h16M10 14.66V17c0 .55.47.98.97 1.21C12.23 18.8 13.77 18.8 15.03 18.21c.5-.23.97-.66.97-1.21v-2.34M12 6v8M12 6c-3.31 0-6 2.69-6 6s2.69 6 6 6 6-2.69 6-6-2.69-6-6-6z" />,
-                Crown: <path d="m2 4 3 12h14l3-12-6 7-4-7-4 7-6-7z" />,
-                CheckCircle2: <path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10zM9 12l2 2 4-4" />,
-                Plus: <path d="M12 5v14M5 12h14" />,
-                Trash2: <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M10 11v6M14 11v6" />,
-                Settings2: <path d="M20 7h-9M14 17H5M17 12H7M7 2h0M7 22h0M17 2h0M17 22h0M7 7a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM17 12a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM7 17a3 3 0 1 0 0 6 3 3 0 0 0 0-6z" />,
-                User: <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2M12 3a4 4 0 1 0 0 8 4 4 0 0 0 0-8z" />,
-                ShieldCheck: <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10zM9 12l2 2 4-4" />,
-                X: <path d="M18 6 6 18M6 6l12 12" />,
-                Heart: <path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z" />,
-                Star: <path d="m12 2 3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />,
-                Sparkles: <path d="m12 3 1.91 5.82L20 10.73l-5.12 3.91L16.79 21 12 17.27 7.21 21l1.91-6.36L4 10.73l6.09-1.91L12 3z" />,
-                GripVertical: <g><circle cx="9" cy="5" r="1"/><circle cx="9" cy="12" r="1"/><circle cx="9" cy="19" r="1"/><circle cx="15" cy="5" r="1"/><circle cx="15" cy="12" r="1"/><circle cx="15" cy="19" r="1"/></g>
-            };
             return (
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" className={className} style={style}>{icons[name]}</svg>
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" className={className} style={style}>{ICONS_DATA[name]}</svg>
             );
         };
 
-        const DB_NAME = 'YangYangRoyal_V51_Adaptive';
+        const defaultTasks = [
+            { id: '1', cat: '每天', title: '聽英文(週二.五.日除外)', rule: [1, 3, 4, 6] },
+            { id: '2', cat: '每天', title: '背誦或複習一個單字(週二.五.日除外)', rule: [1, 3, 4, 6] },
+            { id: '3', cat: '每天', title: '跳繩300下或運動30分鐘(週二.五.日除外)', rule: [1, 3, 4, 6] },
+            { id: '4', cat: '平日', title: '整理書包：乾淨餐具(週二.五.日除外)', rule: [1, 3, 4, 6] },
+            { id: '5', cat: '平日', title: '整理書包：隔天衣服(週二.五.日除外)', rule: [1, 3, 4, 6] },
+            { id: '6', cat: '平日', title: '整理書包：水壺放餐桌(週二.五.日除外)', rule: [1, 3, 4, 6] },
+            { id: '7', cat: '平日', title: '整理書包：口罩放貓咪掛勾(週二.五.日除外)', rule: [1, 3, 4, 6] },
+            { id: '8', cat: '平日', title: '把髒的碗放到廚房(週二.五六.日除外)', rule: [1, 3, 4] },
+            { id: '9', cat: '平日', title: '聯絡本放餐桌(學校+安親班)(週二.五.日除外)', rule: [1, 3, 4, 6] },
+            { id: '10', cat: '平日', title: '吃營養品', rule: [1, 2, 3, 4, 5] },
+            { id: '11', cat: '平日', title: '看一次時鐘,告訴爸媽現幾點(週二.五.日除外)', rule: [1, 3, 4, 6] },
+            { id: '12', cat: '平日', title: '聽與背誦九九乘法表(週二.五.日除外)', rule: [1, 3, 4, 6] },
+            { id: '13', cat: '周六', title: '準備與檢查兩種鉛筆盒', rule: [6] },
+            { id: '14', cat: '周六', title: '檢查學校和葛洛莉書包有沒有垃圾或髒髒的', rule: [6] },
+            { id: '15', cat: '周六', title: '補充口罩或衛生紙包', rule: [6] },
+            { id: '16', cat: '葛洛莉', title: '把葛洛莉用的小水壺放在餐桌上', rule: [3, 6] },
+            { id: '17', cat: '葛洛莉', title: '把英文功課寫完', rule: [3, 6] },
+            { id: '18', cat: '葛洛莉', title: '聯絡簿.Green Card.小考.功課放餐桌', rule: [3, 6] },
+            { id: '19', cat: '週末', title: '喝小安素', rule: [6, 7] }
+        ];
+
+        // --- 存儲邏輯 ---
+        const DB_NAME = 'YangYangRoyal_V54_Full';
         const STORE_NAME = 'ChecklistData';
         const STORAGE_KEYS = {
-            TASKS: 'yang_v51_tasks',
-            TASKS_BAK: 'yang_v51_tasks_bak',
-            PROGRESS: (day) => `yang_v51_checked_${day}`,
-            PROGRESS_BAK: (day) => `yang_v51_checked_${day}_bak`
+            TASKS: 'yang_v54_tasks',
+            TASKS_BAK: 'yang_v54_tasks_bak',
+            PROGRESS: (day) => `yang_v54_checked_${day}`,
+            PROGRESS_BAK: (day) => `yang_v54_checked_${day}_bak`
         };
 
         const openDB = () => {
             return new Promise((resolve) => {
-                const request = indexedDB.open(DB_NAME, 1);
-                request.onupgradeneeded = (e) => e.target.result.createObjectStore(STORE_NAME);
-                request.onsuccess = () => resolve(request.result);
+                try {
+                    if (!window.indexedDB) return resolve(null);
+                    const request = indexedDB.open(DB_NAME, 1);
+                    request.onupgradeneeded = (e) => e.target.result.createObjectStore(STORE_NAME);
+                    request.onsuccess = () => resolve(request.result);
+                    request.onerror = () => resolve(null);
+                } catch(e) { resolve(null); }
             });
         };
 
         const idbSave = async (key, data) => {
             try {
                 const db = await openDB();
-                db.transaction(STORE_NAME, 'readwrite').objectStore(STORE_NAME).put(data, key);
+                if(db) db.transaction(STORE_NAME, 'readwrite').objectStore(STORE_NAME).put(data, key);
             } catch (e) { }
         };
 
         const idbLoad = async (key) => {
             try {
                 const db = await openDB();
+                if (!db) return null;
                 return new Promise((resolve) => {
                     const request = db.transaction(STORE_NAME, 'readonly').objectStore(STORE_NAME).get(key);
                     request.onsuccess = () => resolve(request.result);
@@ -129,22 +191,30 @@
             } catch (e) { return null; }
         };
 
+        const saveTimeouts = {}; 
+
         const robustSave = (key, backupKey, data) => {
             const json = JSON.stringify(data);
             try {
                 localStorage.setItem(key, json);
                 localStorage.setItem(backupKey, json);
-                idbSave(key, data); 
-            } catch (e) { }
+            } catch (e) {}
+            
+            if (saveTimeouts[key]) clearTimeout(saveTimeouts[key]);
+            saveTimeouts[key] = setTimeout(() => {
+                idbSave(key, data);
+            }, 500); 
         };
 
         const robustLoad = async (key, backupKey, defaultValue) => {
             const idbData = await idbLoad(key);
             if (idbData) return idbData;
-            const primary = localStorage.getItem(key);
-            if (primary) { try { return JSON.parse(primary); } catch (e) { } }
-            const backup = localStorage.getItem(backupKey);
-            if (backup) { try { return JSON.parse(backup); } catch (e) { } }
+            try {
+                const primary = localStorage.getItem(key);
+                if (primary) return JSON.parse(primary);
+                const backup = localStorage.getItem(backupKey);
+                if (backup) return JSON.parse(backup);
+            } catch (e) {}
             return defaultValue;
         };
 
@@ -152,20 +222,6 @@
             { id: 1, label: '一' }, { id: 2, label: '二' }, { id: 3, label: '三' },
             { id: 4, label: '四' }, { id: 5, label: '五' }, { id: 6, label: '六' }, { id: 7, label: '日' },
         ];
-
-        const RoyalRays = () => {
-            const angles = [0, 72, 144, 216, 288];
-            return (
-                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[200vmin] h-[200vmin] pointer-events-none z-[-1]"
-                     style={{ maskImage: 'radial-gradient(circle, transparent 3.5%, black 12%)', WebkitMaskImage: 'radial-gradient(circle, transparent 3.5%, black 12%)' }}>
-                    <div className="absolute inset-0 animate-[spin_15s_linear_infinite] flex items-center justify-center">
-                        {angles.map(a => (
-                            <div key={`g1-${a}`} className="absolute h-full" style={{ transform: `rotate(${a}deg)`, width: '80px', background: `linear-gradient(to top, #FFD700, transparent 50%, #FFD700)`, clipPath: 'polygon(49.5% 50%, 50.5% 50%, 100% 0, 0 0, 49.5% 50%, 50.5% 50%, 100% 100%, 0 100%)', opacity: 0.6 }} />
-                        ))}
-                    </div>
-                </div>
-            );
-        };
 
         const App = () => {
             const [mode, setMode] = useState('kid'); 
@@ -185,23 +241,52 @@
 
             const [selectedDay, setSelectedDay] = useState(realDayOfWeek); 
             const [checkedItems, setCheckedItems] = useState({});
-            const [allTasks, setAllTasks] = useState([]);
+            const [allTasks, setAllTasks] = useState(defaultTasks);
             const [isManageOpen, setIsManageOpen] = useState(false);
             const [deleteConfirmId, setDeleteConfirmId] = useState(null);
             const [showCelebration, setShowCelebration] = useState(false);
+            const [draggedIndex, setDraggedIndex] = useState(null);
+
+            // Refs for auto-animate lists
+            const kidListRef = useRef(null);
+            const manageListRef = useRef(null);
+            const tasksRef = useRef(allTasks);
+
+            useEffect(() => { tasksRef.current = allTasks; }, [allTasks]);
+
+            // 初始化 AutoAnimate 以獲得「被推擠」的動畫感
+            useEffect(() => {
+                const applyAnimations = () => {
+                    if (window.autoAnimate) {
+                        if (kidListRef.current) window.autoAnimate(kidListRef.current, { duration: 300, easing: 'ease-out' });
+                        if (manageListRef.current) window.autoAnimate(manageListRef.current, { duration: 300, easing: 'ease-out' });
+                    }
+                };
+                applyAnimations();
+                // 確保套件加載完成後再次綁定
+                const timer = setTimeout(applyAnimations, 500);
+                return () => clearTimeout(timer);
+            }, [isManageOpen]);
 
             useEffect(() => {
-                const initData = async () => {
-                    const tasks = await robustLoad(STORAGE_KEYS.TASKS, STORAGE_KEYS.TASKS_BAK, [
-                        { id: '1', cat: '每天', title: '聽英文', rule: [1, 3, 4, 6] },
-                        { id: '2', cat: '每天', title: '背誦單字', rule: [1, 3, 4, 6] },
-                        { id: '3', cat: '每天', title: '跳繩 300 下', rule: [1, 3, 4, 6] }
-                    ]);
-                    setAllTasks(tasks);
+                const initTasks = async () => {
+                    const tasks = await robustLoad(STORAGE_KEYS.TASKS, STORAGE_KEYS.TASKS_BAK, defaultTasks);
+                    if (Array.isArray(tasks) && tasks.length > 0) {
+                        setAllTasks(tasks);
+                    } else {
+                        setAllTasks(defaultTasks);
+                        robustSave(STORAGE_KEYS.TASKS, STORAGE_KEYS.TASKS_BAK, defaultTasks);
+                    }
+                };
+                initTasks();
+            }, []);
+
+            useEffect(() => {
+                const initProgress = async () => {
                     const checked = await robustLoad(STORAGE_KEYS.PROGRESS(selectedDay), STORAGE_KEYS.PROGRESS_BAK(selectedDay), {});
                     setCheckedItems(checked);
                 };
-                initData();
+                initProgress();
             }, [selectedDay]);
 
             const currentTasks = useMemo(() => allTasks.filter(t => t.rule.includes(selectedDay)), [selectedDay, allTasks]);
@@ -213,6 +298,21 @@
                 else setShowCelebration(false);
             }, [progress, mode, currentTasks.length]);
 
+            const confettiParticles = useMemo(() => {
+                const colors = ['#ef4444', '#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#06b6d4'];
+                return [...Array(60)].map((_, i) => ({
+                    id: i,
+                    color: colors[i % colors.length],
+                    left: `${Math.random() * 100}%`,
+                    width: `10px`,
+                    height: `6px`,
+                    animationDuration: `${Math.random() * 2 + 2}s`,
+                    animationDelay: `${Math.random() * 3}s`,
+                    opacity: Math.random() + 0.5,
+                    transform: `rotate(${Math.random() * 360}deg)`
+                }));
+            }, []);
+
             const toggleItem = (id) => {
                 if (mode === 'kid' && selectedDay !== (realToday.getDay() || 7)) return;
                 const updatedChecked = { ...checkedItems, [id]: !checkedItems[id] };
@@ -221,7 +321,7 @@
             };
 
             const addTask = () => {
-                const newTask = { id: Date.now().toString(), cat: '日常', title: '新項目', rule: [1, 3, 4] };
+                const newTask = { id: Date.now().toString(), cat: '日常', title: '', rule: [1, 3, 4] };
                 const updated = [newTask, ...allTasks];
                 setAllTasks(updated);
                 robustSave(STORAGE_KEYS.TASKS, STORAGE_KEYS.TASKS_BAK, updated);
@@ -252,6 +352,51 @@
                 robustSave(STORAGE_KEYS.TASKS, STORAGE_KEYS.TASKS_BAK, updated);
             };
 
+            // --- 統一指針事件 (解決電腦版 HTML5 Drag 阻擋 AutoAnimate 的問題) ---
+            const handlePointerDown = (e, index) => {
+                // 確保只回應滑鼠左鍵或觸控
+                if (e.pointerType === 'mouse' && e.button !== 0) return;
+                
+                setDraggedIndex(index);
+                document.body.style.overflow = 'hidden';
+                
+                // 鎖定指標捕捉，確保指標就算移到外面也能追蹤
+                try { e.target.setPointerCapture(e.pointerId); } catch(err) {}
+            };
+
+            const handlePointerMove = (e) => {
+                if (draggedIndex === null) return;
+                
+                // 透過座標找出指標下方的元素
+                const element = document.elementFromPoint(e.clientX, e.clientY);
+                if (!element) return;
+                
+                const listItem = element.closest('.task-item');
+                if (listItem) {
+                    const hoverIndex = Number(listItem.getAttribute('data-index'));
+                    if (!isNaN(hoverIndex) && hoverIndex !== draggedIndex) {
+                        // 當碰到不同的項目時交換陣列資料
+                        const updated = [...tasksRef.current];
+                        const temp = updated[draggedIndex];
+                        updated.splice(draggedIndex, 1);
+                        updated.splice(hoverIndex, 0, temp);
+                        
+                        setDraggedIndex(hoverIndex);
+                        setAllTasks(updated);
+                    }
+                }
+            };
+
+            const handlePointerUp = (e) => {
+                if (draggedIndex !== null) {
+                    setDraggedIndex(null);
+                    document.body.style.overflow = '';
+                    robustSave(STORAGE_KEYS.TASKS, STORAGE_KEYS.TASKS_BAK, tasksRef.current);
+                    
+                    try { e.target.releasePointerCapture(e.pointerId); } catch(err) {}
+                }
+            };
+
             const dynamicColor = useMemo(() => {
                 if (currentTasks.length === 0 || completedCount === 0) return "#94a3b8"; 
                 const ratio = completedCount / currentTasks.length;
@@ -266,17 +411,29 @@
                         <div className="fixed inset-0 z-[250] flex flex-col items-center justify-center bg-black/80 backdrop-blur-md cursor-pointer animate-in fade-in duration-500 px-4 text-center"
                              onClick={() => setShowCelebration(false)}>
                             <div className="fixed inset-0 pointer-events-none overflow-hidden">
-                                {[...Array(60)].map((_, i) => (
-                                    <div key={i} className="absolute bg-yellow-400 rounded-sm animate-confetti-fall"
-                                         style={{ left: `${Math.random() * 100}%`, width: `10px`, height: `6px`, animationDuration: `${Math.random() * 2 + 2}s`, animationDelay: `${Math.random() * 3}s`, opacity: Math.random() + 0.5, transform: `rotate(${Math.random() * 360}deg)` }}
+                                {confettiParticles.map((p) => (
+                                    <div key={p.id} className="absolute rounded-sm animate-confetti-fall"
+                                         style={{ 
+                                             backgroundColor: p.color, 
+                                             left: p.left, 
+                                             width: p.width, 
+                                             height: p.height, 
+                                             animationDuration: p.animationDuration, 
+                                             animationDelay: p.animationDelay, 
+                                             opacity: p.opacity, 
+                                             transform: p.transform 
+                                         }}
                                     />
                                 ))}
                             </div>
                             <div className="relative flex flex-col items-center justify-center w-full max-w-2xl transform scale-75 sm:scale-100">
-                                <div className="relative flex items-center justify-center mb-6 w-44 md:w-64 h-44 md:h-64 overflow-visible">
-                                    <RoyalRays />
-                                    <div className="absolute inset-0 bg-yellow-400 blur-[80px] opacity-60 animate-pulse scale-125" />
-                                    <Icon name="Crown" className="relative z-[160] w-2/3 h-2/3 text-yellow-400 drop-shadow-[0_0_60px_rgba(250,204,21,1)] animate-bounce" strokeWidth={1.5} />
+                                {/* 光線與皇冠 (重做版本，保證不變形) */}
+                                <div className="relative flex items-center justify-center w-56 h-56 md:w-72 md:h-72 mb-6">
+                                    {/* 純 CSS 旋轉光束 */}
+                                    <div className="absolute inset-[-50%] sunburst-rays animate-[spin_10s_linear_infinite]" />
+                                    <div className="absolute inset-0 bg-yellow-400 blur-[50px] opacity-40" />
+                                    {/* 絕對尺寸的皇冠，絕對不變形 */}
+                                    <Icon name="Crown" className="relative z-[160] w-32 h-32 md:w-40 md:h-40 text-yellow-400 drop-shadow-[0_0_40px_rgba(250,204,21,1)] animate-bounce" strokeWidth={1.5} />
                                 </div>
                                 <div className="relative z-[160] bg-gradient-to-r from-yellow-300 via-orange-500 to-yellow-300 p-1 rounded-[3rem] shadow-2xl">
                                     <div className="bg-white px-10 py-12 rounded-[2.8rem] flex flex-col items-center overflow-hidden text-center">
@@ -290,7 +447,7 @@
 
                     <div className="main-card p-1.5 md:p-4 lg:p-6 relative overflow-hidden">
                         
-                        {/* 頂部切換: 緊湊型 */}
+                        {/* 頂部切換 */}
                         <div className="flex justify-center mb-2 flex-shrink-0">
                             <div className="bg-white/80 backdrop-blur-sm p-1 rounded-xl shadow-sm border border-slate-200 flex gap-1 items-center">
                                 <button onClick={() => setMode('kid')}
@@ -323,14 +480,15 @@
                                         </p>
                                     </div>
                                     
-                                    {/* 圓環大小適應螢幕 */}
+                                    {/* 圓環進度與獎盃 */}
                                     <div className="flex-shrink-0 w-28 h-28 sm:w-36 sm:h-36 md:w-48 md:h-48 aspect-square flex items-center justify-center bg-white/10 rounded-full border-[6px] border-white/20 shadow-xl backdrop-blur-md relative overflow-hidden group">
                                         {progress === 100 ? (
-                                            <div className="relative animate-in zoom-in duration-500 flex items-center justify-center w-full h-full p-[22%] overflow-visible">
-                                                <Icon name="Trophy" className="w-full h-full trophy-glow animate-bounce-fast" style={{ color: dynamicColor }} />
+                                            /* 獎盃：改為絕對定位+絕對尺寸，徹底解決變形問題 */
+                                            <div className="absolute inset-0 flex items-center justify-center z-10 animate-in zoom-in duration-500">
+                                                <Icon name="Trophy" className="w-14 h-14 sm:w-16 sm:h-16 md:w-20 md:h-20 trophy-glow animate-bounce-fast" style={{ color: dynamicColor }} />
                                             </div>
                                         ) : (
-                                            <span className="text-3xl sm:text-5xl md:text-7xl font-black z-10 text-white drop-shadow-md tracking-tighter">
+                                            <span className="absolute inset-0 flex items-center justify-center text-3xl sm:text-5xl md:text-7xl font-black z-10 text-white drop-shadow-md tracking-tighter">
                                                 {progress}<span className="text-sm sm:text-xl ml-0.5 opacity-70">%</span>
                                             </span>
                                         )}
@@ -342,7 +500,7 @@
                                 </div>
                             </div>
 
-                            {/* 星期導航: 縮小高度 */}
+                            {/* 星期導航 */}
                             <div className="flex justify-around px-4 py-3 md:px-10 md:py-6 bg-white border-b border-slate-50 no-scrollbar gap-1 flex-shrink-0">
                                 {daysWithDates.map((day) => (
                                     <button key={day.id} onClick={() => setSelectedDay(day.id)}
@@ -358,10 +516,10 @@
                                 ))}
                             </div>
 
-                            {/* 任務清單區: 雙欄排列 + 緊湊卡片 */}
+                            {/* 任務清單區 */}
                             <div className="scrollable-area no-scrollbar p-3 md:p-8 touch-pan-y bg-slate-50/50">
                                 {!isManageOpen && (
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-6">
+                                    <div ref={kidListRef} className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-6">
                                         {currentTasks.length > 0 ? (
                                             currentTasks.map((task) => (
                                                 <div key={task.id} onClick={() => toggleItem(task.id)}
@@ -378,7 +536,7 @@
                                                     </div>
                                                     <div className="flex-1 overflow-hidden text-left">
                                                        <span className={`text-[10px] px-3 py-1 rounded-full font-black uppercase mb-1.5 inline-block ${
-                                                        task.cat === '每天' ? 'bg-orange-100 text-orange-600' : task.cat === '平日' ? 'bg-blue-100 text-blue-600' : task.cat === '葛洛莉' ? 'bg-emerald-100 text-emerald-600' : task.cat === '周末' ? 'bg-purple-100 text-purple-600' : 'bg-slate-100 text-slate-500'
+                                                        task.cat === '每天' ? 'bg-orange-100 text-orange-600' : task.cat === '平日' ? 'bg-blue-100 text-blue-600' : task.cat === '葛洛莉' ? 'bg-emerald-100 text-emerald-600' : task.cat === '週末' || task.cat === '周六' ? 'bg-purple-100 text-purple-600' : 'bg-slate-100 text-slate-500'
                                                       }`}>{task.cat}</span>
                                                       <p className={`text-base sm:text-xl md:text-3xl font-black leading-snug tracking-tighter text-slate-800 break-words ${checkedItems[task.id] ? 'opacity-20 italic' : ''}`}>
                                                         {task.title}
@@ -411,11 +569,20 @@
                                                 <button onClick={addTask} className="w-full py-8 border-2 border-dashed border-indigo-200 rounded-3xl text-indigo-400 font-black text-lg hover:bg-indigo-50 flex items-center justify-center gap-4 transition-all">
                                                     <Icon name="Plus" className="w-8 h-8" /> 新增一個王者作息
                                                 </button>
-                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                                    {allTasks.map((task) => (
-                                                        <div key={task.id} className="bg-white border border-slate-100 p-6 rounded-[2rem] shadow-sm flex flex-col group relative overflow-hidden">
+                                                
+                                                {/* 加載 AutoAnimate 的拖曳區域 */}
+                                                <div ref={manageListRef} className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-6">
+                                                    {allTasks.map((task, index) => (
+                                                        <div 
+                                                            key={task.id} 
+                                                            data-index={index}
+                                                            /* 移除傳統 Draggable，改用指標事件實現萬用流暢推擠 */
+                                                            className={`task-item bg-white border-2 p-5 md:p-8 rounded-[2rem] md:rounded-[3rem] shadow-sm flex flex-col justify-center relative overflow-hidden transition-all duration-300 ${
+                                                                draggedIndex === index ? 'opacity-95 scale-[1.02] -translate-y-1 ring-4 ring-indigo-400 shadow-2xl z-50 border-indigo-300' : 'border-slate-100 hover:border-indigo-100'
+                                                            }`}
+                                                        >
                                                             {deleteConfirmId === task.id && (
-                                                                <div className="absolute inset-0 bg-red-600/95 z-10 flex flex-col items-center justify-center p-4 text-white rounded-[2rem]">
+                                                                <div className="absolute inset-0 bg-red-600/95 z-20 flex flex-col items-center justify-center p-4 text-white rounded-[2rem] md:rounded-[3rem]">
                                                                     <p className="font-black text-lg mb-4">確定刪除？</p>
                                                                     <div className="flex gap-4 w-full px-6 justify-center">
                                                                         <button onClick={() => confirmRemoveTask(task.id)} className="flex-1 bg-white text-red-600 py-2 rounded-xl font-black shadow-xl">刪除</button>
@@ -423,15 +590,33 @@
                                                                     </div>
                                                                 </div>
                                                             )}
-                                                            <div className="flex items-start gap-3 mb-6">
-                                                                <div className="flex-1">
-                                                                    <input value={task.title} onChange={(e) => updateTask(task.id, 'title', e.target.value)} className="w-full text-xl font-black bg-slate-50 border-none rounded-xl px-4 py-2 outline-none focus:ring-2 ring-indigo-200 text-left" />
+                                                            
+                                                            <div className="flex items-center gap-4 mb-4">
+                                                                <div className="flex-shrink-0 relative">
+                                                                    {/* 指標事件綁定在此處，統一支援滑鼠與觸控 */}
+                                                                    <div 
+                                                                        onPointerDown={(e) => handlePointerDown(e, index)}
+                                                                        onPointerMove={handlePointerMove}
+                                                                        onPointerUp={handlePointerUp}
+                                                                        onPointerCancel={handlePointerUp}
+                                                                        className={`w-14 h-14 rounded-2xl border-[4px] border-indigo-50 bg-indigo-50/50 flex items-center justify-center drag-handle touch-none cursor-grab text-slate-400 transition-colors ${draggedIndex === index ? 'drag-active text-indigo-600' : 'hover:text-indigo-600 hover:bg-indigo-100'}`}
+                                                                    >
+                                                                        <Icon name="GripVertical" className="w-8 h-8 pointer-events-none" />
+                                                                    </div>
                                                                 </div>
-                                                                <button onClick={() => setDeleteConfirmId(task.id)} className="p-3 text-slate-200 hover:text-red-500 transition-all"><Icon name="Trash2" className="w-6 h-6" /></button>
+                                                                
+                                                                <div className="flex-1 overflow-hidden">
+                                                                    <input value={task.title} onChange={(e) => updateTask(task.id, 'title', e.target.value)} className="w-full text-lg sm:text-xl md:text-2xl font-black bg-slate-50 border-none rounded-xl px-3 py-2 outline-none focus:ring-2 ring-indigo-200 text-left transition-shadow" placeholder="輸入作息..." />
+                                                                </div>
+                                                                
+                                                                <button onClick={() => setDeleteConfirmId(task.id)} className="flex-shrink-0 p-3 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all">
+                                                                    <Icon name="Trash2" className="w-6 h-6" />
+                                                                </button>
                                                             </div>
-                                                            <div className="flex wrap gap-1.5 justify-center">
+                                                            
+                                                            <div className="flex flex-wrap gap-1.5 justify-start pl-[4.5rem]">
                                                                 {baseDays.map(d => (
-                                                                    <button key={d.id} onClick={() => toggleTaskRule(task.id, d.id)} className={`w-9 h-9 rounded-xl text-xs font-black transition-all ${task.rule.includes(d.id) ? 'bg-indigo-600 text-white shadow-md' : 'bg-slate-50 text-slate-300 hover:bg-slate-100'}`}>{d.label}</button>
+                                                                    <button key={d.id} onClick={() => toggleTaskRule(task.id, d.id)} className={`w-8 h-8 md:w-9 md:h-9 rounded-xl text-xs font-black transition-all ${task.rule.includes(d.id) ? 'bg-indigo-600 text-white shadow-md' : 'bg-slate-50 text-slate-400 hover:bg-slate-100'}`}>{d.label}</button>
                                                                 ))}
                                                             </div>
                                                         </div>
@@ -443,10 +628,10 @@
                                 )}
                             </div>
 
-                            {/* Footer: 緊湊型 */}
+                            {/* Footer */}
                             <div className="py-4 bg-slate-50 border-t border-slate-100 flex justify-center items-center flex-shrink-0">
                                 <div className="flex items-center gap-6 text-[10px] font-black text-slate-300 tracking-[0.6em] uppercase opacity-60 text-center">
-                                   YANG YANG ROYAL v51.0
+                                   YANG YANG ROYAL v54.0
                                 </div>
                             </div>
                         </div>
