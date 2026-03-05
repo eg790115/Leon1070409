@@ -5,6 +5,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>洋洋作息打勾表</title>
     
+    <!-- 強制瀏覽器不快取，解決 GitHub Pages 更新後平板沒跟著更新的問題 -->
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    
+    <!-- 解決安卓/小米平板 PWA 全螢幕與安裝問題 -->
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-touch-fullscreen" content="yes">
@@ -35,10 +41,12 @@
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- 動畫引擎 -->
     <script src="https://cdn.jsdelivr.net/npm/@formkit/auto-animate@0.8.2/index.global.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
 
     <style>
+        /* 鎖定螢幕與防呆 */
         body, html {
             margin: 0; padding: 0; height: 100%; width: 100%;
             overflow: hidden; background-color: #f1f5f9;
@@ -49,12 +57,14 @@
         .no-scrollbar::-webkit-scrollbar { display: none; }
         .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
         
+        /* 硬體加速動畫 */
         @keyframes bounce-fast { 0%, 100% { transform: translateY(0) scale(1); } 50% { transform: translateY(-10%) scale(1.05); } }
         .animate-bounce-fast { animation: bounce-fast 0.6s infinite ease-in-out; will-change: transform; }
         
         @keyframes confetti-fall { 0% { transform: translateY(-10vh) rotate(0deg); opacity: 1; } 100% { transform: translateY(110vh) rotate(720deg); opacity: 0; } }
         .animate-confetti-fall { animation: confetti-fall linear infinite; will-change: transform, opacity; }
 
+        /* 全螢幕雙層光芒特效 (減半細緻版) */
         .sunburst-layer-1 {
             background: repeating-conic-gradient(from 0deg, #FDE047 0deg 4deg, transparent 4deg 40deg);
             border-radius: 50%;
@@ -183,18 +193,18 @@
             { id: '19', cat: '週末', title: '喝小安素', rule: [6, 7] }
         ];
 
-        const DB_NAME = 'YangYangRoyal_V65';
+        const DB_NAME = 'YangYangRoyal_V66';
         const STORE_NAME = 'ChecklistData';
         
         const getYYYYMMDD = (date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 
         const STORAGE_KEYS = {
-            TASKS: 'yang_v65_tasks',
-            TASKS_BAK: 'yang_v65_tasks_bak',
-            PROGRESS: (dateStr) => `yang_v65_checked_${dateStr}`,
-            PROGRESS_BAK: (dateStr) => `yang_v65_checked_${dateStr}_bak`,
-            COMPLETED_DATES: 'yang_v65_completed_dates',
-            REWARDS: 'yang_v65_rewards' 
+            TASKS: 'yang_v66_tasks',
+            TASKS_BAK: 'yang_v66_tasks_bak',
+            PROGRESS: (dateStr) => `yang_v66_checked_${dateStr}`,
+            PROGRESS_BAK: (dateStr) => `yang_v66_checked_${dateStr}_bak`,
+            COMPLETED_DATES: 'yang_v66_completed_dates',
+            REWARDS: 'yang_v66_rewards' 
         };
 
         const openDB = () => {
@@ -823,7 +833,6 @@
                 setEditingRewardId(null);
             };
 
-            // 驗證週期是否仍然保持全數完成 (防呆紅色警告使用)
             const isPeriodFullyCompleted = useCallback((periodId) => {
                 const completedSet = new Set(completedDates);
                 if (periodId.startsWith('W-')) {
@@ -1051,6 +1060,7 @@
 
                                     <div className="bg-white flex-1 rounded-b-2xl md:rounded-b-[3.5rem] shadow-inner overflow-y-auto p-4 md:p-6 -mt-px relative z-0">
                                         
+                                        {/* 分頁 1：月曆補登 */}
                                         {parentTab === 'log' && (
                                             <div className="max-w-2xl mx-auto space-y-4">
                                                 <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
@@ -1141,6 +1151,7 @@
                                             </div>
                                         )}
 
+                                        {/* 分頁 2：獎品紀錄 */}
                                         {parentTab === 'rewards' && (
                                             <div className="max-w-2xl mx-auto space-y-6">
                                                 
@@ -1267,6 +1278,7 @@
                                             </div>
                                         )}
 
+                                        {/* 分頁 3：作息維護 */}
                                         {parentTab === 'manage' && (
                                             <div className="max-w-4xl mx-auto space-y-4">
                                                 <button onClick={addTask} className="w-full py-5 border-2 border-dashed border-indigo-300 rounded-2xl text-indigo-500 font-black text-base hover:bg-indigo-50 flex items-center justify-center gap-2 transition-all">
