@@ -98,22 +98,32 @@
         /* --- SortableJS 拖曳專用特效 --- */
         .touch-none { touch-action: none; }
         
-        /* 拖曳時，原位置會留下一個淡色的坑位 (Placeholder) */
+        /* 拖曳時，原位置會留下一個明顯的「空洞坑位」 */
         .sortable-ghost {
-            opacity: 0.3 !important;
-            background-color: #f8fafc !important;
+            opacity: 1 !important;
+            background-color: #f1f5f9 !important;
             border: 3px dashed #cbd5e1 !important;
-            transform: scale(0.98);
+            box-shadow: inset 0 4px 6px rgba(0, 0, 0, 0.05) !important;
         }
         
-        /* 被拿起正在半空中的圖卡樣式 (漂浮、陰影、放大) */
+        /* 關鍵修正：隱藏空位裡面的所有內容，消除「有兩張卡片」的錯覺 */
+        .sortable-ghost > * {
+            visibility: hidden !important;
+        }
+        
+        /* 被拿起正在半空中的圖卡樣式 (漂浮、陰影) */
         .sortable-drag {
             opacity: 1 !important;
             cursor: grabbing !important;
-            transform: scale(1.03) !important;
-            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25), 0 0 0 4px rgba(129, 140, 248, 0.5) !important;
-            border-color: #818cf8 !important;
-            z-index: 100 !important;
+            background-color: #ffffff !important;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.3), 0 0 0 2px rgba(99, 102, 241, 0.5) !important;
+            border-radius: 2rem !important; 
+            z-index: 9999 !important;
+        }
+        @media (min-width: 768px) {
+            .sortable-drag {
+                border-radius: 3rem !important;
+            }
         }
     </style>
 </head>
@@ -293,18 +303,31 @@
                 let sortableInstance;
                 if (isManageOpen && manageListRef.current && window.Sortable) {
                     sortableInstance = new window.Sortable(manageListRef.current, {
-                        animation: 250, // 動畫過渡時間 (毫秒)，越長越滑順
+                        animation: 250, // 動畫過渡時間 (毫秒)，產生滑順推擠感
                         easing: "cubic-bezier(0.25, 1, 0.5, 1)", 
                         handle: '.drag-handle', // 限制只有點擊把手才能拖曳
                         ghostClass: 'sortable-ghost',
                         dragClass: 'sortable-drag',
-                        forceFallback: true, // 強制使用自定義樣式，關閉原生 HTML5 的半透明殘影
-                        fallbackClass: 'sortable-drag',
-                        fallbackOnBody: true, // 確保拖曳中的卡片層級(z-index)在最上方不受干擾
+                        forceFallback: true, // 強制使用自定義樣式
+                        fallbackTolerance: 3, // 容錯機制：移動超過 3px 才算拖曳，避免點擊輸入框時誤判
+                        
+                        onStart: (evt) => {
+                            // 強制將拖曳中的分身鎖定為原來的實際寬度與高度
+                            if (evt.dragged) {
+                                evt.dragged.style.width = evt.item.offsetWidth + 'px';
+                                evt.dragged.style.height = evt.item.offsetHeight + 'px';
+                            }
+                        },
                         onEnd: (evt) => {
-                            const { oldIndex, newIndex } = evt;
-                            if (oldIndex !== newIndex) {
-                                // 這裡安全地同步 React State
+                            const { oldIndex, newIndex, item } = evt;
+                            if (oldIndex !== newIndex && oldIndex !== undefined && newIndex !== undefined) {
+                                // 為了不讓 React 與 Sortable 直接修改的 DOM 打架
+                                // 我們需要先把 DOM 節點塞回原本的位置，然後再透過改變 state 讓 React 來負責重新渲染畫面
+                                const parent = evt.to;
+                                const sibling = oldIndex < newIndex ? parent.children[oldIndex] : parent.children[oldIndex + 1];
+                                parent.insertBefore(item, sibling);
+
+                                // 同步更新 React State
                                 setAllTasks(prev => {
                                     const newTasks = [...prev];
                                     const [moved] = newTasks.splice(oldIndex, 1);
@@ -557,6 +580,7 @@
                                                     {allTasks.map((task) => (
                                                         <div 
                                                             key={task.id} 
+                                                            data-id={task.id}
                                                             /* 確保卡片本身沒有會干擾拖拉物理效果的 transform 漸變，讓 SortableJS 全權控制動畫 */
                                                             className={`task-item bg-white border-2 border-slate-100 p-5 md:p-8 rounded-[2rem] md:rounded-[3rem] shadow-sm flex flex-col justify-center relative overflow-hidden`}
                                                         >
