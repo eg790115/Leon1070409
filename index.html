@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>洋洋作息打勾表</title>
     
-    <!-- 解決安卓/小米平板 PWA 全螢幕與安裝問題的專用標籤 -->
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-touch-fullscreen" content="yes">
@@ -14,7 +13,6 @@
     <meta name="theme-color" content="#f97316">
     <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/1426/1426735.png">
 
-    <!-- 動態產生 PWA Manifest -->
     <link id="manifest-link" rel="manifest">
     <script>
       (function() {
@@ -26,33 +24,21 @@
           "display_override": ["fullscreen", "standalone"],
           "background_color": "#f1f5f9",
           "theme_color": "#f97316",
-          "icons": [
-            {
-              "src": "https://cdn-icons-png.flaticon.com/512/1426/1426735.png",
-              "sizes": "512x512",
-              "type": "image/png",
-              "purpose": "any maskable"
-            }
-          ]
+          "icons": [{ "src": "https://cdn-icons-png.flaticon.com/512/1426/1426735.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }]
         };
         var blob = new Blob([JSON.stringify(manifest)], { type: 'application/manifest+json' });
         document.getElementById('manifest-link').href = URL.createObjectURL(blob);
       })();
     </script>
 
-    <!-- 載入 React、Tailwind 與 動畫引擎 -->
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
-    
-    <!-- 引入 AutoAnimate (負責打勾時的完美推擠與補位動畫) -->
     <script src="https://cdn.jsdelivr.net/npm/@formkit/auto-animate@0.8.2/index.global.js"></script>
-    <!-- 引入 SortableJS (負責管理模式的編輯拖拉) -->
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
 
     <style>
-        /* 鎖定螢幕，達成全適應 App 體驗 */
         body, html {
             margin: 0; padding: 0; height: 100%; width: 100%;
             overflow: hidden; background-color: #f1f5f9;
@@ -60,117 +46,62 @@
             overscroll-behavior: none;
         }
         #root { height: 100%; }
-        
-        /* 隱藏捲軸但保留捲動 */
         .no-scrollbar::-webkit-scrollbar { display: none; }
         .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
         
-        /* 動畫 */
-        @keyframes bounce-fast {
-            0%, 100% { transform: translateY(0) scale(1); }
-            50% { transform: translateY(-10%) scale(1.05); }
-        }
-        .animate-bounce-fast { animation: bounce-fast 0.6s infinite ease-in-out; }
+        @keyframes bounce-fast { 0%, 100% { transform: translateY(0) scale(1); } 50% { transform: translateY(-10%) scale(1.05); } }
+        .animate-bounce-fast { animation: bounce-fast 0.6s infinite ease-in-out; will-change: transform; }
         
-        @keyframes confetti-fall {
-            0% { transform: translateY(-10vh) rotate(0deg); opacity: 1; }
-            100% { transform: translateY(110vh) rotate(720deg); opacity: 0; }
-        }
-        .animate-confetti-fall { animation: confetti-fall linear infinite; }
+        @keyframes confetti-fall { 0% { transform: translateY(-10vh) rotate(0deg); opacity: 1; } 100% { transform: translateY(110vh) rotate(720deg); opacity: 0; } }
+        .animate-confetti-fall { animation: confetti-fall linear infinite; will-change: transform, opacity; }
 
-        /* 純 CSS 旋轉光芒 */
-        .sunburst-rays {
-            background: repeating-conic-gradient(from 0deg, #FFD700 0deg 18deg, #FFFFFF 18deg 36deg);
-            mask-image: radial-gradient(circle, transparent 15%, black 65%);
-            -webkit-mask-image: radial-gradient(circle, transparent 15%, black 65%);
+        .sunburst-layer-1 {
+            background: repeating-conic-gradient(from 0deg, #FDE047 0deg 4deg, transparent 4deg 40deg);
+            border-radius: 50%;
+            animation: spin-rays 35s linear infinite;
         }
+        .sunburst-layer-2 {
+            background: repeating-conic-gradient(from 10deg, rgba(255,255,255,0.7) 0deg 3deg, transparent 3deg 45deg);
+            border-radius: 50%;
+            animation: spin-rays 20s linear infinite;
+        }
+        @keyframes spin-rays { 100% { transform: rotate(360deg); } }
         
-        /* 佈局容器 */
-        .app-container {
-            height: 100vh; display: flex; flex-direction: column; overflow: hidden;
-        }
-        .main-card {
-            flex: 1; display: flex; flex-direction: column; min-height: 0; 
-        }
-        .scrollable-area {
-            flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch;
-        }
-        .trophy-glow { filter: drop-shadow(0 0 15px rgba(250, 204, 21, 0.8)); }
+        .app-container { height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+        .main-card { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+        .scrollable-area { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; }
         
-        /* --- SortableJS 拖曳專用特效 (管理模式) --- */
         .touch-none { touch-action: none; }
 
         .task-inner {
-            transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1), 
-                        box-shadow 0.4s ease, 
-                        opacity 0.4s ease, 
-                        background-color 0.4s ease,
-                        border-color 0.4s ease,
-                        filter 0.4s ease;
+            transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.4s ease, opacity 0.4s ease, background-color 0.4s ease, border-color 0.4s ease;
             transform-origin: center center;
+            will-change: transform, opacity;
         }
         
         .sortable-ghost { opacity: 1 !important; }
-        .sortable-ghost .task-inner {
-            background-color: #f8fafc !important;
-            border: 3px dashed #cbd5e1 !important;
-            box-shadow: inset 0 4px 10px rgba(0, 0, 0, 0.05) !important;
-            transform: scale(0.97) !important; 
-        }
-        .sortable-ghost .task-inner > * { visibility: hidden !important; }
+        .sortable-ghost > div { background-color: #f8fafc !important; border: 2px dashed #cbd5e1 !important; box-shadow: inset 0 4px 10px rgba(0,0,0,0.05) !important; opacity: 0.5 !important; }
+        .sortable-drag { opacity: 1 !important; cursor: grabbing !important; z-index: 9999 !important; }
+        .sortable-drag > div { background-color: #ffffff !important; box-shadow: 0 20px 40px -10px rgba(0,0,0,0.2), 0 0 0 2px rgba(99,102,241,0.6) !important; border-color: transparent !important; transform: scale(1.02) rotate(1deg) !important; }
         
-        .sortable-drag {
-            opacity: 1 !important;
-            cursor: grabbing !important;
-            z-index: 9999 !important;
-        }
-        .sortable-drag .task-inner {
-            background-color: #ffffff !important;
-            box-shadow: 0 35px 60px -15px rgba(0, 0, 0, 0.35), 0 0 0 2px rgba(99, 102, 241, 0.6) !important;
-            border-color: transparent !important;
-            transform: scale(1.05) rotate(2deg) !important; 
-        }
+        @keyframes check-pop { 0% { transform: scale(0.3); opacity: 0; } 50% { transform: scale(1.3); opacity: 1; } 100% { transform: scale(1); opacity: 1; } }
+        .animate-check-pop { animation: check-pop 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; will-change: transform, opacity; }
         
-        /* --- 洋洋模式：打勾彈出的跳動特效 --- */
-        @keyframes check-pop {
-            0% { transform: scale(0.3); opacity: 0; }
-            50% { transform: scale(1.3); opacity: 1; }
-            100% { transform: scale(1); opacity: 1; }
-        }
-        .animate-check-pop { 
-            animation: check-pop 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; 
-        }
+        @keyframes particle-blast { 0% { transform: translate(0, 0) scale(1) rotate(0deg); opacity: 1; } 100% { transform: translate(var(--tx), var(--ty)) scale(0) rotate(180deg); opacity: 0; } }
+        .animate-particle { animation: particle-blast 0.6s cubic-bezier(0.25, 1, 0.5, 1) forwards; will-change: transform, opacity; }
         
-        /* 魔法星星特效 */
-        @keyframes particle-blast {
-            0% { transform: translate(0, 0) scale(1) rotate(0deg); opacity: 1; }
-            100% { transform: translate(var(--tx), var(--ty)) scale(0) rotate(180deg); opacity: 0; }
-        }
-        .animate-particle {
-            animation: particle-blast 0.6s cubic-bezier(0.25, 1, 0.5, 1) forwards;
-        }
-        
-        /* 卡片開心搖擺舞 */
-        @keyframes happy-dance {
-            0%, 100% { transform: translateY(0) scale(1); }
-            20% { transform: translateY(-8px) scale(1.03) rotate(-2deg); }
-            40% { transform: translateY(0px) scale(1.03) rotate(2deg); }
-            60% { transform: translateY(-4px) scale(1.03) rotate(-1deg); }
-            80% { transform: translateY(0px) scale(1.03) rotate(1deg); }
-        }
-        .animate-happy-dance {
-            animation: happy-dance 0.7s ease-in-out forwards;
-            box-shadow: 0 0 30px rgba(52, 211, 153, 0.6) !important;
-            border-color: #34d399 !important;
-            z-index: 50;
-        }
+        @keyframes happy-dance { 0%, 100% { transform: translateY(0) scale(1); } 20% { transform: translateY(-8px) scale(1.03) rotate(-2deg); } 40% { transform: translateY(0px) scale(1.03) rotate(2deg); } 60% { transform: translateY(-4px) scale(1.03) rotate(-1deg); } 80% { transform: translateY(0px) scale(1.03) rotate(1deg); } }
+        .animate-happy-dance { animation: happy-dance 0.7s ease-in-out forwards; box-shadow: 0 0 30px rgba(52, 211, 153, 0.5) !important; border-color: #34d399 !important; z-index: 50; will-change: transform; }
+
+        @keyframes slide-down-fade { from { opacity: 0; transform: translateY(-10px) scale(0.98); } to { opacity: 1; transform: translateY(0) scale(1); } }
+        .animate-slide-down { animation: slide-down-fade 0.3s cubic-bezier(0.2, 1, 0.2, 1) forwards; }
     </style>
 </head>
 <body>
     <div id="root"></div>
 
     <script type="text/babel">
-        const { useState, useEffect, useMemo, useRef } = React;
+        const { useState, useEffect, useMemo, useRef, useCallback } = React;
 
         const ICONS_DATA = {
             Calendar: <path d="M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z" />,
@@ -180,45 +111,38 @@
             Trash2: <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M10 11v6M14 11v6" />,
             Settings2: <path d="M20 7h-9M14 17H5M17 12H7M7 2h0M7 22h0M17 2h0M17 22h0M7 7a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM17 12a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM7 17a3 3 0 1 0 0 6 3 3 0 0 0 0-6z" />,
             GripVertical: <g><circle cx="9" cy="5" r="1.5"/><circle cx="9" cy="12" r="1.5"/><circle cx="9" cy="19" r="1.5"/><circle cx="15" cy="5" r="1.5"/><circle cx="15" cy="12" r="1.5"/><circle cx="15" cy="19" r="1.5"/></g>,
-            Heart: <path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z" />
+            Heart: <path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z" />,
+            X: <path d="M18 6 6 18M6 6l12 12" />,
+            ChevronLeft: <path d="m15 18-6-6 6-6" />,
+            ChevronRight: <path d="m9 18 6-6-6-6" />,
+            Gift: <path d="M20 12v10H4V12M2 7h20v5H2zM12 22V7M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7zM12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z" />,
+            Edit2: <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z" />,
+            AlertTriangle: <><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z" /><path d="M12 9v4" /><path d="M12 17h.01" /></>
         };
 
         const Icon = ({ name, className = "w-6 h-6", style = {}, strokeWidth = 2.5 }) => {
-            return (
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" className={className} style={style}>{ICONS_DATA[name]}</svg>
-            );
+            return <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" className={className} style={style}>{ICONS_DATA[name]}</svg>;
         };
 
         const MagicSparkles = () => {
             return (
                 <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-[100]">
-                    {[...Array(12)].map((_, i) => {
-                        const angle = (i * 30) * Math.PI / 180;
-                        const distance = 50 + Math.random() * 40;
+                    {[...Array(8)].map((_, i) => {
+                        const angle = (i * 45) * Math.PI / 180;
+                        const distance = 40 + Math.random() * 30;
                         const tx = Math.cos(angle) * distance + 'px';
                         const ty = Math.sin(angle) * distance + 'px';
-                        const colors = ['#ef4444', '#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899'];
+                        const colors = ['#ef4444', '#3b82f6', '#10b981', '#f59e0b'];
                         const color = colors[i % colors.length];
-                        const size = 6 + Math.random() * 8; 
-                        return (
-                            <div key={i} className="absolute rounded-full animate-particle"
-                                 style={{
-                                     width: `${size}px`, 
-                                     height: `${size}px`,
-                                     '--tx': tx, 
-                                     '--ty': ty,
-                                     backgroundColor: color,
-                                     boxShadow: `0 0 ${size/2}px ${color}`
-                                 }}
-                            />
-                        )
+                        const size = 5 + Math.random() * 6; 
+                        return <div key={i} className="absolute rounded-full animate-particle" style={{ width: `${size}px`, height: `${size}px`, '--tx': tx, '--ty': ty, backgroundColor: color }} />
                     })}
                 </div>
             );
         };
 
         const CustomNewTrophy = ({ color }) => (
-            <svg viewBox="0 0 100 100" fill="none" stroke={color} xmlns="http://www.w3.org/2000/svg" className="w-16 h-16 sm:w-20 sm:h-20 md:w-24 md:h-24 trophy-glow animate-bounce-fast">
+            <svg viewBox="0 0 100 100" fill="none" stroke={color} xmlns="http://www.w3.org/2000/svg" className="w-16 h-16 sm:w-20 sm:h-20 md:w-24 md:h-24 trophy-glow animate-bounce-fast" style={{ filter: `drop-shadow(0 0 10px ${color})` }}>
                 <path d="M20 30 H10 v10 a10 10 0 0 0 10 10 M80 30 H90 v10 a10 10 0 0 1 -10 10" strokeWidth="8" strokeLinecap="round" strokeLinejoin="round"/>
                 <path d="M20 20 H80 V40 A 30 30 0 0 1 20 40 Z" fill={color} fillOpacity="0.2" strokeWidth="8" strokeLinejoin="round"/>
                 <path d="M45 70 H55 V85 H45 Z" fill={color} fillOpacity="0.2" strokeWidth="8" strokeLinejoin="round"/>
@@ -228,57 +152,54 @@
         );
 
         const RoyalRays = () => {
-            const angles = [0, 36, 72, 108, 144, 180, 216, 252, 288, 324];
             return (
-                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[200vmin] h-[200vmin] pointer-events-none z-[-1]"
-                     style={{ maskImage: 'radial-gradient(circle, transparent 3.5%, black 15%)', WebkitMaskImage: 'radial-gradient(circle, transparent 3.5%, black 15%)' }}>
-                    <div className="absolute inset-0 animate-[spin_15s_linear_infinite] flex items-center justify-center">
-                        {angles.map((a, index) => {
-                            const rayColor = index % 2 === 0 ? '#FFD700' : '#FFFFFF'; 
-                            return (
-                                <div key={`g1-${a}`} className="absolute h-full" style={{ transform: `rotate(${a}deg)`, width: '60px', background: `linear-gradient(to top, ${rayColor}, transparent 50%, ${rayColor})`, clipPath: 'polygon(49.5% 50%, 50.5% 50%, 100% 0, 0 0, 49.5% 50%, 50.5% 50%, 100% 100%, 0 100%)', opacity: 0.6 }} />
-                            );
-                        })}
-                    </div>
+                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[250vmax] h-[250vmax] pointer-events-none z-[-1] opacity-75"
+                     style={{ maskImage: 'radial-gradient(circle, transparent 5%, black 15%)', WebkitMaskImage: 'radial-gradient(circle, transparent 5%, black 15%)' }}>
+                    <div className="absolute inset-0 sunburst-layer-1" />
+                    <div className="absolute inset-0 sunburst-layer-2" />
                 </div>
             );
         };
 
         const defaultTasks = [
-            { id: '1', cat: '每天', title: '聽英文(週二.五.日除外)', rule: [1, 3, 4, 6] },
-            { id: '2', cat: '每天', title: '背誦或複習一個單字(週二.五.日除外)', rule: [1, 3, 4, 6] },
-            { id: '3', cat: '每天', title: '跳繩300下或運動30分鐘(週二.五.日除外)', rule: [1, 3, 4, 6] },
-            { id: '4', cat: '平日', title: '整理書包：乾淨餐具(週二.五.日除外)', rule: [1, 3, 4, 6] },
-            { id: '5', cat: '平日', title: '整理書包：隔天衣服(週二.五.日除外)', rule: [1, 3, 4, 6] },
-            { id: '6', cat: '平日', title: '整理書包：水壺放餐桌(週二.五.日除外)', rule: [1, 3, 4, 6] },
-            { id: '7', cat: '平日', title: '整理書包：口罩放貓咪掛勾(週二.五.日除外)', rule: [1, 3, 4, 6] },
-            { id: '8', cat: '平日', title: '把髒的碗放到廚房(週二.五六.日除外)', rule: [1, 3, 4] },
-            { id: '9', cat: '平日', title: '聯絡本放餐桌(學校+安親班)(週二.五.日除外)', rule: [1, 3, 4, 6] },
+            { id: '1', cat: '每天', title: '聽英文', rule: [1, 3, 4, 6] },
+            { id: '2', cat: '每天', title: '背誦或複習一個單字', rule: [1, 3, 4, 6] },
+            { id: '3', cat: '每天', title: '跳繩300下或運動30分鐘', rule: [1, 3, 4, 6] },
+            { id: '4', cat: '平日', title: '整理書包：乾淨餐具', rule: [1, 3, 4, 6] },
+            { id: '5', cat: '平日', title: '整理書包：隔天衣服', rule: [1, 3, 4, 6] },
+            { id: '6', cat: '平日', title: '整理書包：水壺放餐桌', rule: [1, 3, 4, 6] },
+            { id: '7', cat: '平日', title: '整理書包：口罩放貓咪掛勾', rule: [1, 3, 4, 6] },
+            { id: '8', cat: '平日', title: '把髒的碗放到廚房', rule: [1, 3, 4] },
+            { id: '9', cat: '平日', title: '聯絡本放餐桌', rule: [1, 3, 4, 6] },
             { id: '10', cat: '平日', title: '吃營養品', rule: [1, 2, 3, 4, 5] },
-            { id: '11', cat: '平日', title: '看一次時鐘,告訴爸媽現幾點(週二.五.日除外)', rule: [1, 3, 4, 6] },
-            { id: '12', cat: '平日', title: '聽與背誦九九乘法表(週二.五.日除外)', rule: [1, 3, 4, 6] },
+            { id: '11', cat: '平日', title: '看一次時鐘告訴爸媽幾點', rule: [1, 3, 4, 6] },
+            { id: '12', cat: '平日', title: '聽與背誦九九乘法表', rule: [1, 3, 4, 6] },
             { id: '13', cat: '周六', title: '準備與檢查兩種鉛筆盒', rule: [6] },
-            { id: '14', cat: '周六', title: '檢查學校和葛洛莉書包有沒有垃圾或髒髒的', rule: [6] },
+            { id: '14', cat: '周六', title: '檢查書包有沒有垃圾', rule: [6] },
             { id: '15', cat: '周六', title: '補充口罩或衛生紙包', rule: [6] },
-            { id: '16', cat: '葛洛莉', title: '把葛洛莉用的小水壺放在餐桌上', rule: [3, 6] },
+            { id: '16', cat: '葛洛莉', title: '把小水壺放在餐桌上', rule: [3, 6] },
             { id: '17', cat: '葛洛莉', title: '把英文功課寫完', rule: [3, 6] },
-            { id: '18', cat: '葛洛莉', title: '聯絡簿.Green Card.小考.功課放餐桌', rule: [3, 6] },
+            { id: '18', cat: '葛洛莉', title: '聯絡簿與Green Card放餐桌', rule: [3, 6] },
             { id: '19', cat: '週末', title: '喝小安素', rule: [6, 7] }
         ];
 
-        const DB_NAME = 'YangYangRoyal_V54_Full';
+        const DB_NAME = 'YangYangRoyal_V65';
         const STORE_NAME = 'ChecklistData';
+        
+        const getYYYYMMDD = (date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+
         const STORAGE_KEYS = {
-            TASKS: 'yang_v54_tasks',
-            TASKS_BAK: 'yang_v54_tasks_bak',
-            PROGRESS: (day) => `yang_v54_checked_${day}`,
-            PROGRESS_BAK: (day) => `yang_v54_checked_${day}_bak`
+            TASKS: 'yang_v65_tasks',
+            TASKS_BAK: 'yang_v65_tasks_bak',
+            PROGRESS: (dateStr) => `yang_v65_checked_${dateStr}`,
+            PROGRESS_BAK: (dateStr) => `yang_v65_checked_${dateStr}_bak`,
+            COMPLETED_DATES: 'yang_v65_completed_dates',
+            REWARDS: 'yang_v65_rewards' 
         };
 
         const openDB = () => {
             return new Promise((resolve) => {
                 try {
-                    if (!window.indexedDB) return resolve(null);
                     const request = indexedDB.open(DB_NAME, 1);
                     request.onupgradeneeded = (e) => e.target.result.createObjectStore(STORE_NAME);
                     request.onsuccess = () => resolve(request.result);
@@ -287,13 +208,7 @@
             });
         };
 
-        const idbSave = async (key, data) => {
-            try {
-                const db = await openDB();
-                if(db) db.transaction(STORE_NAME, 'readwrite').objectStore(STORE_NAME).put(data, key);
-            } catch (e) { }
-        };
-
+        const idbSave = async (key, data) => { try { const db = await openDB(); if(db) db.transaction(STORE_NAME, 'readwrite').objectStore(STORE_NAME).put(data, key); } catch (e) {} };
         const idbLoad = async (key) => {
             try {
                 const db = await openDB();
@@ -307,18 +222,11 @@
         };
 
         const saveTimeouts = {}; 
-
         const robustSave = (key, backupKey, data) => {
             const json = JSON.stringify(data);
-            try {
-                localStorage.setItem(key, json);
-                localStorage.setItem(backupKey, json);
-            } catch (e) {}
-            
+            try { localStorage.setItem(key, json); localStorage.setItem(backupKey, json); } catch (e) {}
             if (saveTimeouts[key]) clearTimeout(saveTimeouts[key]);
-            saveTimeouts[key] = setTimeout(() => {
-                idbSave(key, data);
-            }, 500); 
+            saveTimeouts[key] = setTimeout(() => idbSave(key, data), 500); 
         };
 
         const robustLoad = async (key, backupKey, defaultValue) => {
@@ -338,16 +246,76 @@
             { id: 4, label: '四' }, { id: 5, label: '五' }, { id: 6, label: '六' }, { id: 7, label: '日' },
         ];
 
-        const triggerVibration = () => {
+        const triggerVibration = () => { try { if (window.navigator && window.navigator.vibrate) window.navigator.vibrate([30, 50, 30]); } catch (e) {} };
+
+        const playSound = (type) => {
             try {
-                if (window.navigator && window.navigator.vibrate) {
-                    window.navigator.vibrate([30, 50, 30]); 
+                const AudioContext = window.AudioContext || window.webkitAudioContext;
+                if (!AudioContext) return;
+                const ctx = new AudioContext();
+                const gain = ctx.createGain();
+                gain.connect(ctx.destination);
+
+                if (type === 'check') {
+                    const osc = ctx.createOscillator();
+                    osc.connect(gain);
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(600, ctx.currentTime);
+                    osc.frequency.exponentialRampToValueAtTime(1200, ctx.currentTime + 0.1);
+                    gain.gain.setValueAtTime(0.2, ctx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.1);
+                    osc.start();
+                    osc.stop(ctx.currentTime + 0.1);
+                } else if (type === 'uncheck') {
+                    const osc = ctx.createOscillator();
+                    osc.connect(gain);
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(400, ctx.currentTime);
+                    osc.frequency.exponentialRampToValueAtTime(200, ctx.currentTime + 0.1);
+                    gain.gain.setValueAtTime(0.2, ctx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.1);
+                    osc.start();
+                    osc.stop(ctx.currentTime + 0.1);
+                } else if (type === 'tada') {
+                    const freqs = [523.25, 659.25, 783.99, 1046.50]; 
+                    freqs.forEach((f, i) => {
+                        const osc = ctx.createOscillator();
+                        const g = ctx.createGain();
+                        osc.connect(g);
+                        g.connect(ctx.destination);
+                        osc.type = 'triangle';
+                        osc.frequency.value = f;
+                        g.gain.setValueAtTime(0, ctx.currentTime + i * 0.1);
+                        g.gain.linearRampToValueAtTime(0.2, ctx.currentTime + i * 0.1 + 0.05);
+                        g.gain.linearRampToValueAtTime(0, ctx.currentTime + i * 0.1 + 0.3);
+                        osc.start(ctx.currentTime + i * 0.1);
+                        osc.stop(ctx.currentTime + i * 0.1 + 0.3);
+                    });
                 }
-            } catch (e) {}
+            } catch(e) {}
+        };
+
+        const getWeekLabel = (dateStr) => {
+            const dObj = new Date(dateStr);
+            const m = dObj.getMonth() + 1;
+            const firstDay = new Date(dObj.getFullYear(), dObj.getMonth(), 1).getDay() || 7;
+            const weekNum = Math.ceil((dObj.getDate() + firstDay - 1) / 7);
+            const weekNames = ['一', '二', '三', '四', '五', '六'];
+            return `${m}月第${weekNames[weekNum - 1] || weekNum}週`;
+        };
+
+        const isDayActuallyCompleted = (dateStr, completedSet, allTasks) => {
+            if (completedSet.has(dateStr)) return true;
+            const dObj = new Date(dateStr);
+            const dow = dObj.getDay() || 7;
+            const tasksForDay = allTasks.filter(t => t.rule.includes(dow));
+            return tasksForDay.length === 0;
         };
 
         const App = () => {
             const [mode, setMode] = useState('kid'); 
+            const [parentTab, setParentTab] = useState('log'); 
+
             const [realToday] = useState(new Date());
             const realDayOfWeek = useMemo(() => realToday.getDay() || 7, [realToday]);
             const formattedDate = useMemo(() => `${realToday.getFullYear()}年${realToday.getMonth() + 1}月${realToday.getDate()}日`, [realToday]);
@@ -358,38 +326,73 @@
                 return baseDays.map((day, index) => {
                     const d = new Date(monday);
                     d.setDate(monday.getDate() + index);
-                    const fullDateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+                    const fullDateStr = getYYYYMMDD(d);
                     return { ...day, dateStr: `${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')}`, fullDateStr };
                 });
             }, [realToday, realDayOfWeek]);
 
             const [selectedDay, setSelectedDay] = useState(realDayOfWeek); 
+            const activeDateStr = useMemo(() => daysWithDates.find(d => d.id === selectedDay)?.fullDateStr, [selectedDay, daysWithDates]);
+            const isFutureDate = useMemo(() => activeDateStr > getYYYYMMDD(realToday), [activeDateStr, realToday]);
+
             const [checkedItems, setCheckedItems] = useState({});
             const [sortingCheckedItems, setSortingCheckedItems] = useState({});
             const [completedDates, setCompletedDates] = useState([]); 
+            const [allTasks, setAllTasks] = useState(defaultTasks);
             
-            // 加入進度載入鎖定，防止切換天數時發生陣列洗牌誤刪達標紀錄
-            const [isLoadingProgress, setIsLoadingProgress] = useState(true);
+            const [rewards, setRewards] = useState([]);
+            const [pendingRewardsInputs, setPendingRewardsInputs] = useState({});
             
+            const [editingRewardId, setEditingRewardId] = useState(null);
+            const [editRewardTitle, setEditRewardTitle] = useState('');
+            
+            const [syncTrigger, setSyncTrigger] = useState(0);
+
             const [celebratingCards, setCelebratingCards] = useState({}); 
             const [teleportingCards, setTeleportingCards] = useState({}); 
-            
-            const [allTasks, setAllTasks] = useState(defaultTasks);
-            const [isManageOpen, setIsManageOpen] = useState(false);
-            const [deleteConfirmId, setDeleteConfirmId] = useState(null);
             const [showCelebration, setShowCelebration] = useState(false);
+            const [isLoadingProgress, setIsLoadingProgress] = useState(true);
+
+            const [deleteConfirmId, setDeleteConfirmId] = useState(null);
+            const [parentMonthOffset, setParentMonthOffset] = useState(0); 
+            
+            const [selectedLogDateStr, setSelectedLogDateStr] = useState(null);
+            const [animatingLogTasks, setAnimatingLogTasks] = useState({});
 
             const manageListRef = useRef(null);
             const kidListRef = useRef(null);
+            const logListRef = useRef(null);
             const completionTimeouts = useRef({});
             const sortableInstanceRef = useRef(null);
 
+            const touchStartX = useRef(null);
+            const touchEndX = useRef(null);
+
+            const handleTouchStart = (e) => { touchStartX.current = e.touches[0].clientX; };
+            const handleTouchMove = (e) => { touchEndX.current = e.touches[0].clientX; };
+            const handleTouchEnd = () => {
+                if (!touchStartX.current || !touchEndX.current) return;
+                const distance = touchStartX.current - touchEndX.current;
+                if (mode === 'kid') {
+                    if (distance > 50 && selectedDay < 7) setSelectedDay(selectedDay + 1);
+                    else if (distance < -50 && selectedDay > 1) setSelectedDay(selectedDay - 1);
+                }
+                touchStartX.current = null;
+                touchEndX.current = null;
+            };
+
             useEffect(() => {
                 const interval = setInterval(() => {
-                    if (kidListRef.current && window.autoAnimate) {
+                    if (kidListRef.current && window.autoAnimate && mode === 'kid') {
                         if (!kidListRef.current.hasAttribute('data-aa')) {
-                            window.autoAnimate(kidListRef.current, { duration: 400, easing: 'ease-in-out' });
+                            window.autoAnimate(kidListRef.current, { duration: 350, easing: 'ease-in-out' });
                             kidListRef.current.setAttribute('data-aa', 'true');
+                        }
+                    }
+                    if (logListRef.current && window.autoAnimate && mode === 'parent') {
+                        if (!logListRef.current.hasAttribute('data-aa')) {
+                            window.autoAnimate(logListRef.current, { duration: 300, easing: 'ease-in-out' });
+                            logListRef.current.setAttribute('data-aa', 'true');
                         }
                     }
                 }, 150); 
@@ -397,29 +400,21 @@
             }); 
 
             useEffect(() => {
-                if (isManageOpen && manageListRef.current && window.Sortable) {
+                if (mode === 'parent' && parentTab === 'manage' && manageListRef.current && window.Sortable) {
                     if (!sortableInstanceRef.current) {
                         sortableInstanceRef.current = new window.Sortable(manageListRef.current, {
-                            animation: 350, 
-                            easing: "cubic-bezier(0.25, 1, 0.5, 1)", 
+                            animation: 250, 
                             handle: '.drag-handle',
                             ghostClass: 'sortable-ghost',
                             dragClass: 'sortable-drag',
                             forceFallback: true, 
                             fallbackTolerance: 3, 
-                            onStart: (evt) => {
-                                if (evt.dragged) {
-                                    evt.dragged.style.width = evt.item.offsetWidth + 'px';
-                                    evt.dragged.style.height = evt.item.offsetHeight + 'px';
-                                }
-                            },
                             onEnd: (evt) => {
                                 const { oldIndex, newIndex, item } = evt;
                                 if (oldIndex !== newIndex && oldIndex !== undefined && newIndex !== undefined) {
                                     const parent = evt.to;
                                     const sibling = oldIndex < newIndex ? parent.children[oldIndex] : parent.children[oldIndex + 1];
                                     parent.insertBefore(item, sibling);
-
                                     setAllTasks(prev => {
                                         const newTasks = [...prev];
                                         const [moved] = newTasks.splice(oldIndex, 1);
@@ -440,27 +435,26 @@
             });
 
             useEffect(() => {
-                const initTasksAndDates = async () => {
+                const initData = async () => {
                     const tasks = await robustLoad(STORAGE_KEYS.TASKS, STORAGE_KEYS.TASKS_BAK, defaultTasks);
-                    if (Array.isArray(tasks) && tasks.length > 0) {
-                        setAllTasks(tasks);
-                    } else {
-                        setAllTasks(defaultTasks);
-                        robustSave(STORAGE_KEYS.TASKS, STORAGE_KEYS.TASKS_BAK, defaultTasks);
-                    }
+                    if (Array.isArray(tasks) && tasks.length > 0) setAllTasks(tasks);
+                    else { setAllTasks(defaultTasks); robustSave(STORAGE_KEYS.TASKS, STORAGE_KEYS.TASKS_BAK, defaultTasks); }
                     
-                    const dates = await robustLoad('yang_v54_completed_dates', 'yang_v54_completed_dates_bak', []);
+                    const dates = await robustLoad(STORAGE_KEYS.COMPLETED_DATES, STORAGE_KEYS.COMPLETED_DATES + '_bak', []);
                     setCompletedDates(dates);
+                    
+                    const rewardsData = await robustLoad(STORAGE_KEYS.REWARDS, STORAGE_KEYS.REWARDS + '_bak', []);
+                    setRewards(rewardsData);
                 };
-                initTasksAndDates();
+                initData();
             }, []);
 
-            // 修復1：利用 isLoadingProgress 鎖定載入期間，防止閃爍
             useEffect(() => {
+                if (!activeDateStr) return;
                 let isMounted = true;
                 const initProgress = async () => {
                     setIsLoadingProgress(true);
-                    const checked = await robustLoad(STORAGE_KEYS.PROGRESS(selectedDay), STORAGE_KEYS.PROGRESS_BAK(selectedDay), {});
+                    const checked = await robustLoad(STORAGE_KEYS.PROGRESS(activeDateStr), STORAGE_KEYS.PROGRESS_BAK(activeDateStr), {});
                     if (isMounted) {
                         setCheckedItems(checked);
                         setSortingCheckedItems(checked);
@@ -470,76 +464,65 @@
                     }
                 };
                 initProgress();
-                
                 return () => {
                     isMounted = false;
                     Object.values(completionTimeouts.current).forEach(clearTimeout);
                     completionTimeouts.current = {};
                 };
-            }, [selectedDay]);
+            }, [activeDateStr]); 
+
+            const checkAndUpdateCompletion = (dateStr, dow, currentChecked) => {
+                const dayTasks = allTasks.filter(t => t.rule.includes(dow));
+                const isComplete = dayTasks.length === 0 || dayTasks.filter(t => currentChecked[t.id]).length === dayTasks.length;
+
+                setCompletedDates(prev => {
+                    const hasIt = prev.includes(dateStr);
+                    if (isComplete && !hasIt) {
+                        const next = [...prev, dateStr];
+                        robustSave(STORAGE_KEYS.COMPLETED_DATES, STORAGE_KEYS.COMPLETED_DATES + '_bak', next);
+                        return next;
+                    } else if (!isComplete && hasIt) {
+                        const next = prev.filter(d => d !== dateStr);
+                        robustSave(STORAGE_KEYS.COMPLETED_DATES, STORAGE_KEYS.COMPLETED_DATES + '_bak', next);
+                        return next;
+                    }
+                    return prev;
+                });
+            };
 
             const currentTasks = useMemo(() => {
                 const filtered = allTasks.filter(t => t.rule.includes(selectedDay));
                 return filtered.sort((a, b) => {
                     const aChecked = sortingCheckedItems[a.id] === true;
                     const bChecked = sortingCheckedItems[b.id] === true;
-                    
-                    if (aChecked === bChecked) {
-                        return allTasks.findIndex(t => t.id === a.id) - allTasks.findIndex(t => t.id === b.id);
-                    }
+                    if (aChecked === bChecked) return allTasks.findIndex(t => t.id === a.id) - allTasks.findIndex(t => t.id === b.id);
                     return aChecked ? 1 : -1;
                 });
             }, [selectedDay, allTasks, sortingCheckedItems]);
             
             const completedCount = currentTasks.filter(t => checkedItems[t.id]).length;
             const progress = currentTasks.length ? Math.round((completedCount / currentTasks.length) * 100) : 0;
-            
-            // 修復2：當該天完全沒有任務(放假)時，自動視為 100% 達標，不中斷天數！
-            const isDayCompleted = currentTasks.length === 0 ? true : progress === 100;
 
             useEffect(() => {
                 if (isLoadingProgress) return;
-
-                if (progress === 100 && currentTasks.length > 0 && mode === 'kid') {
+                
+                if (progress === 100 && currentTasks.length > 0 && mode === 'kid' && selectedDay === realDayOfWeek) {
                     setShowCelebration(true);
                 } else {
                     setShowCelebration(false);
                 }
 
-                const selectedDayData = daysWithDates.find(d => d.id === selectedDay);
-                if (selectedDayData && selectedDayData.fullDateStr) {
-                    const fullDateStr = selectedDayData.fullDateStr;
-                    setCompletedDates(prev => {
-                        if (isDayCompleted) {
-                            if (!prev.includes(fullDateStr)) {
-                                const newDates = [...prev, fullDateStr];
-                                robustSave('yang_v54_completed_dates', 'yang_v54_completed_dates_bak', newDates);
-                                return newDates;
-                            }
-                        } else {
-                            if (prev.includes(fullDateStr)) {
-                                const newDates = prev.filter(d => d !== fullDateStr);
-                                robustSave('yang_v54_completed_dates', 'yang_v54_completed_dates_bak', newDates);
-                                return newDates;
-                            }
-                        }
-                        return prev;
-                    });
+                if (activeDateStr) {
+                    checkAndUpdateCompletion(activeDateStr, selectedDay, checkedItems);
                 }
-            }, [isDayCompleted, progress, mode, currentTasks.length, selectedDay, daysWithDates, isLoadingProgress]);
+            }, [progress, mode, currentTasks.length, selectedDay, realDayOfWeek, isLoadingProgress, activeDateStr, checkedItems]);
 
-            // 修復3：即使當天沒有打開 App，放假日也會自動被承認計算在連續達標內
             const currentStreak = useMemo(() => {
-                const getYYYYMMDD = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-                
                 const checkIsCompleted = (dateObj) => {
                     const dateStr = getYYYYMMDD(dateObj);
                     if (completedDates.includes(dateStr)) return true;
-                    
-                    const dayOfWeek = dateObj.getDay() || 7;
-                    const tasksForThatDay = allTasks.filter(t => t.rule.includes(dayOfWeek));
-                    if (tasksForThatDay.length === 0) return true; // 沒任務=放假=達標！
-                    
+                    const dow = dateObj.getDay() || 7;
+                    if (allTasks.filter(t => t.rule.includes(dow)).length === 0) return true; 
                     return false;
                 };
 
@@ -554,68 +537,204 @@
                     if (checkIsCompleted(checkDate)) {
                         streak++;
                         checkDate.setDate(checkDate.getDate() - 1);
-                    } else {
-                        return 0; // 昨天今天都沒達標，斷更
-                    }
+                    } else { return 0; }
                 }
 
                 while (true) {
                     if (checkIsCompleted(checkDate)) {
                         streak++;
                         checkDate.setDate(checkDate.getDate() - 1);
-                    } else {
-                        break;
-                    }
+                    } else { break; }
                 }
                 return streak;
             }, [completedDates, realToday, allTasks]);
 
-            const confettiParticles = useMemo(() => {
-                const colors = ['#ef4444', '#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#06b6d4'];
-                return [...Array(60)].map((_, i) => ({
-                    id: i,
-                    color: colors[i % colors.length],
-                    left: `${Math.random() * 100}%`,
-                    width: `10px`,
-                    height: `6px`,
-                    animationDuration: `${Math.random() * 2 + 2}s`,
-                    animationDelay: `${Math.random() * 3}s`,
-                    opacity: Math.random() + 0.5,
-                    transform: `rotate(${Math.random() * 360}deg)`
-                }));
-            }, []);
+            const currentWeekProgress = useMemo(() => {
+                const mon = new Date(realToday);
+                const day = mon.getDay() || 7;
+                mon.setDate(mon.getDate() - day + 1); 
+                let count = 0;
+                const completedSet = new Set(completedDates);
+                for(let i=0; i<7; i++) {
+                    const cur = new Date(mon);
+                    cur.setDate(cur.getDate() + i);
+                    if (isDayActuallyCompleted(getYYYYMMDD(cur), completedSet, allTasks)) count++;
+                }
+                return count;
+            }, [realToday, completedDates, allTasks]);
+
+            const currentMonthProgress = useMemo(() => {
+                const y = realToday.getFullYear();
+                const m = realToday.getMonth() + 1;
+                const daysInMonth = new Date(y, m, 0).getDate();
+                let count = 0;
+                const completedSet = new Set(completedDates);
+                for(let i=1; i<=daysInMonth; i++) {
+                    const cur = `${y}-${String(m).padStart(2,'0')}-${String(i).padStart(2,'0')}`;
+                    if (isDayActuallyCompleted(cur, completedSet, allTasks)) count++;
+                }
+                return { count, total: daysInMonth };
+            }, [realToday, completedDates, allTasks]);
+
+            const unclaimedRewards = useMemo(() => {
+                const completedSet = new Set(completedDates);
+                const available = [];
+
+                const startOfWeek = new Date(realToday);
+                const day = startOfWeek.getDay() || 7;
+                startOfWeek.setDate(startOfWeek.getDate() - day + 1);
+
+                for (let w = 0; w < 8; w++) {
+                    const mon = new Date(startOfWeek);
+                    mon.setDate(mon.getDate() - w * 7);
+                    const wId = `W-${getYYYYMMDD(mon)}`;
+                    if (rewards.some(r => r.periodId === wId)) continue; 
+
+                    let isFull = true;
+                    for(let i=0; i<7; i++) {
+                        const cur = new Date(mon);
+                        cur.setDate(cur.getDate() + i);
+                        if (!isDayActuallyCompleted(getYYYYMMDD(cur), completedSet, allTasks)) {
+                            isFull = false; break;
+                        }
+                    }
+                    if (isFull) {
+                        const end = new Date(mon); end.setDate(end.getDate() + 6);
+                        available.push({
+                            periodId: wId,
+                            type: 'weekly',
+                            label: `${getWeekLabel(getYYYYMMDD(mon))} 達成 (${mon.getMonth()+1}/${mon.getDate()}~${end.getMonth()+1}/${end.getDate()})`
+                        });
+                    }
+                }
+
+                const startOfMonth = new Date(realToday.getFullYear(), realToday.getMonth(), 1);
+                for (let m = 0; m < 6; m++) {
+                    const curMonth = new Date(startOfMonth.getFullYear(), startOfMonth.getMonth() - m, 1);
+                    const mId = `M-${curMonth.getFullYear()}-${String(curMonth.getMonth()+1).padStart(2,'0')}`;
+                    if (rewards.some(r => r.periodId === mId)) continue;
+
+                    const daysInMonth = new Date(curMonth.getFullYear(), curMonth.getMonth()+1, 0).getDate();
+                    let isFull = true;
+                    for(let i=1; i<=daysInMonth; i++) {
+                        const cur = `${curMonth.getFullYear()}-${String(curMonth.getMonth()+1).padStart(2,'0')}-${String(i).padStart(2,'0')}`;
+                        if (!isDayActuallyCompleted(cur, completedSet, allTasks)) {
+                            isFull = false; break;
+                        }
+                    }
+                    if (isFull) {
+                        available.push({
+                            periodId: mId,
+                            type: 'monthly',
+                            label: `${curMonth.getMonth()+1}月份 全月達成`
+                        });
+                    }
+                }
+                return available.sort((a,b) => b.periodId.localeCompare(a.periodId)); 
+            }, [completedDates, allTasks, rewards, realToday]);
+
+            const parentCalendarData = useMemo(() => {
+                const base = new Date(realToday);
+                base.setMonth(base.getMonth() + parentMonthOffset);
+                const year = base.getFullYear();
+                const month = base.getMonth();
+                const firstDay = new Date(year, month, 1).getDay() || 7;
+                const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+                const data = [];
+                for(let i = 1; i < firstDay; i++) data.push(null);
+                
+                for(let i = 1; i <= daysInMonth; i++) {
+                    const d = new Date(year, month, i);
+                    const dateStr = getYYYYMMDD(d);
+                    const dow = d.getDay() || 7;
+                    const dayTasks = allTasks.filter(t => t.rule.includes(dow));
+                    
+                    const raw = localStorage.getItem(STORAGE_KEYS.PROGRESS(dateStr)) || localStorage.getItem(STORAGE_KEYS.PROGRESS_BAK(dateStr));
+                    const checked = raw ? JSON.parse(raw) : {};
+                    
+                    const completedCount = dayTasks.filter(t => checked[t.id]).length;
+                    data.push({ date: i, dateStr, dow, total: dayTasks.length, uncompleted: dayTasks.length - completedCount, checkedData: checked });
+                }
+                return { year, month: month + 1, data };
+            }, [parentMonthOffset, allTasks, realToday, syncTrigger]);
+
+            const selectedLogDayObj = useMemo(() => {
+                return parentCalendarData.data.find(d => d && d.dateStr === selectedLogDateStr);
+            }, [parentCalendarData, selectedLogDateStr]);
+
+            const logDayTasks = useMemo(() => {
+                if (!selectedLogDayObj) return [];
+                return allTasks.filter(t => t.rule.includes(selectedLogDayObj.dow)).sort((a, b) => {
+                    const aC = selectedLogDayObj.checkedData[a.id];
+                    const bC = selectedLogDayObj.checkedData[b.id];
+                    if (aC === bC) return allTasks.findIndex(t=>t.id===a.id) - allTasks.findIndex(t=>t.id===b.id);
+                    return aC ? 1 : -1; 
+                });
+            }, [selectedLogDayObj, allTasks]);
+
+            const handleLogTask = (taskId, dayObj) => {
+                const isCurrentlyChecked = !!dayObj.checkedData[taskId];
+                
+                if (isCurrentlyChecked) playSound('uncheck');
+                else playSound('check');
+
+                setAnimatingLogTasks(prev => ({ ...prev, [taskId]: !isCurrentlyChecked ? 'checking' : 'unchecking' }));
+                
+                setTimeout(() => {
+                    const updatedChecked = { ...dayObj.checkedData, [taskId]: !isCurrentlyChecked };
+                    robustSave(STORAGE_KEYS.PROGRESS(dayObj.dateStr), STORAGE_KEYS.PROGRESS_BAK(dayObj.dateStr), updatedChecked);
+                    
+                    checkAndUpdateCompletion(dayObj.dateStr, dayObj.dow, updatedChecked);
+                    setSyncTrigger(prev => prev + 1); 
+                    
+                    setAnimatingLogTasks(prev => {
+                        const next = {...prev};
+                        delete next[taskId];
+                        return next;
+                    });
+                }, 250); 
+            };
 
             const toggleItem = (id) => {
-                if (mode === 'kid' && selectedDay !== (realToday.getDay() || 7)) return;
+                if (mode === 'kid' && isFutureDate) return; 
+                if (mode === 'kid' && selectedDay !== (realToday.getDay() || 7)) return; 
                 
                 const isNowChecked = !checkedItems[id];
                 const updatedChecked = { ...checkedItems, [id]: isNowChecked };
                 setCheckedItems(updatedChecked);
-                robustSave(STORAGE_KEYS.PROGRESS(selectedDay), STORAGE_KEYS.PROGRESS_BAK(selectedDay), updatedChecked);
+                robustSave(STORAGE_KEYS.PROGRESS(activeDateStr), STORAGE_KEYS.PROGRESS_BAK(activeDateStr), updatedChecked);
                 
                 if (completionTimeouts.current[`cel_${id}`]) clearTimeout(completionTimeouts.current[`cel_${id}`]);
                 if (completionTimeouts.current[`tel_${id}`]) clearTimeout(completionTimeouts.current[`tel_${id}`]);
                 if (completionTimeouts.current[`sort_${id}`]) clearTimeout(completionTimeouts.current[`sort_${id}`]);
                 if (completionTimeouts.current[`fin_${id}`]) clearTimeout(completionTimeouts.current[`fin_${id}`]);
 
+                const nextCompletedCount = currentTasks.filter(t => updatedChecked[t.id]).length;
+                if (isNowChecked && nextCompletedCount === currentTasks.length && currentTasks.length > 0) {
+                    setShowCelebration(true);
+                    playSound('tada'); 
+                }
+
                 if (isNowChecked) {
+                    playSound('check');
                     triggerVibration(); 
-                    
                     setCelebratingCards(prev => ({ ...prev, [id]: true }));
 
                     completionTimeouts.current[`cel_${id}`] = setTimeout(() => {
                         setTeleportingCards(prev => ({ ...prev, [id]: true }));
-
+                        
                         completionTimeouts.current[`sort_${id}`] = setTimeout(() => {
                             setSortingCheckedItems(prev => ({ ...prev, [id]: true }));
-
+                            
                             completionTimeouts.current[`fin_${id}`] = setTimeout(() => {
                                 setCelebratingCards(prev => ({ ...prev, [id]: false }));
                                 setTeleportingCards(prev => ({ ...prev, [id]: false }));
                             }, 50); 
                         }, 300);
-                    }, 700); 
+                    }, 600); 
                 } else {
+                    playSound('uncheck');
                     setSortingCheckedItems(prev => ({ ...prev, [id]: false }));
                     setCelebratingCards(prev => ({ ...prev, [id]: false }));
                     setTeleportingCards(prev => ({ ...prev, [id]: false }));
@@ -627,6 +746,7 @@
                 const updated = [newTask, ...allTasks];
                 setAllTasks(updated);
                 robustSave(STORAGE_KEYS.TASKS, STORAGE_KEYS.TASKS_BAK, updated);
+                setSyncTrigger(prev => prev + 1);
             };
 
             const confirmRemoveTask = (id) => {
@@ -634,12 +754,14 @@
                 setAllTasks(updated);
                 robustSave(STORAGE_KEYS.TASKS, STORAGE_KEYS.TASKS_BAK, updated);
                 setDeleteConfirmId(null);
+                setSyncTrigger(prev => prev + 1);
             };
 
             const updateTask = (id, field, value) => {
                 const updated = allTasks.map(t => t.id === id ? { ...t, [field]: value } : t);
                 setAllTasks(updated);
                 robustSave(STORAGE_KEYS.TASKS, STORAGE_KEYS.TASKS_BAK, updated);
+                setSyncTrigger(prev => prev + 1);
             };
 
             const toggleTaskRule = (taskId, dayId) => {
@@ -652,7 +774,84 @@
                 });
                 setAllTasks(updated);
                 robustSave(STORAGE_KEYS.TASKS, STORAGE_KEYS.TASKS_BAK, updated);
+                setSyncTrigger(prev => prev + 1);
             };
+
+            const handleClaimReward = (rewardObj) => {
+                const title = pendingRewardsInputs[rewardObj.periodId];
+                if (!title || !title.trim()) return;
+
+                let sortKey = rewardObj.periodId.substring(2);
+                if (rewardObj.type === 'monthly') sortKey += '-01';
+
+                const newRecord = {
+                    id: Date.now().toString(),
+                    periodId: rewardObj.periodId,
+                    periodLabel: rewardObj.label,
+                    title: title.trim(),
+                    date: formattedDate,
+                    type: rewardObj.type,
+                    sortKey: sortKey
+                };
+                const updated = [newRecord, ...rewards];
+                setRewards(updated);
+                robustSave(STORAGE_KEYS.REWARDS, STORAGE_KEYS.REWARDS + '_bak', updated);
+                
+                setPendingRewardsInputs(prev => {
+                    const next = {...prev};
+                    delete next[rewardObj.periodId];
+                    return next;
+                });
+            };
+
+            const handleDeleteReward = (id) => {
+                const updated = rewards.filter(r => r.id !== id);
+                setRewards(updated);
+                robustSave(STORAGE_KEYS.REWARDS, STORAGE_KEYS.REWARDS + '_bak', updated);
+            };
+
+            const startEditReward = (reward) => {
+                setEditingRewardId(reward.id);
+                setEditRewardTitle(reward.title);
+            };
+
+            const saveEditReward = () => {
+                if (!editRewardTitle.trim()) return;
+                const updated = rewards.map(r => r.id === editingRewardId ? { ...r, title: editRewardTitle.trim() } : r);
+                setRewards(updated);
+                robustSave(STORAGE_KEYS.REWARDS, STORAGE_KEYS.REWARDS + '_bak', updated);
+                setEditingRewardId(null);
+            };
+
+            // 驗證週期是否仍然保持全數完成 (防呆紅色警告使用)
+            const isPeriodFullyCompleted = useCallback((periodId) => {
+                const completedSet = new Set(completedDates);
+                if (periodId.startsWith('W-')) {
+                    const dateStr = periodId.substring(2);
+                    const start = new Date(dateStr);
+                    for(let i=0; i<7; i++) {
+                        const cur = new Date(start);
+                        cur.setDate(cur.getDate() + i);
+                        if (!isDayActuallyCompleted(getYYYYMMDD(cur), completedSet, allTasks)) return false;
+                    }
+                    return true;
+                } else if (periodId.startsWith('M-')) {
+                    const parts = periodId.substring(2).split('-');
+                    const y = parseInt(parts[0], 10);
+                    const m = parseInt(parts[1], 10);
+                    const daysInMonth = new Date(y, m, 0).getDate();
+                    for(let i=1; i<=daysInMonth; i++) {
+                        const cur = `${y}-${String(m).padStart(2,'0')}-${String(i).padStart(2,'0')}`;
+                        if (!isDayActuallyCompleted(cur, completedSet, allTasks)) return false;
+                    }
+                    return true;
+                }
+                return true;
+            }, [completedDates, allTasks]);
+
+            const sortedRewardsHistory = useMemo(() => {
+                return [...rewards].sort((a, b) => (b.sortKey || b.id).localeCompare(a.sortKey || a.id));
+            }, [rewards]);
 
             const dynamicColor = useMemo(() => {
                 if (currentTasks.length === 0 || completedCount === 0) return "#94a3b8"; 
@@ -669,38 +868,33 @@
                 return "洋洋，太棒了！";
             }, [progress, currentTasks.length]);
 
+            const confettiRender = useMemo(() => {
+                return [...Array(30)].map((_, i) => {
+                    const colors = ['#ef4444', '#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899'];
+                    return (
+                        <div key={i} className="absolute rounded-sm animate-confetti-fall"
+                             style={{ backgroundColor: colors[i % colors.length], left: `${Math.random() * 100}%`, width: `10px`, height: `8px`, animationDuration: `${Math.random() * 2 + 2}s`, animationDelay: `${Math.random() * 3}s`, opacity: Math.random() + 0.5 }} />
+                    );
+                });
+            }, []);
+
             return (
-                <div className="app-container">
-                    
+                <div className="app-container" onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd}>
+
                     {showCelebration && (
-                        <div className="fixed inset-0 z-[250] flex flex-col items-center justify-center bg-black/80 backdrop-blur-md cursor-pointer animate-in fade-in duration-500 px-4 text-center"
+                        <div className="fixed inset-0 z-[250] flex flex-col items-center justify-center bg-black/60 backdrop-blur-sm cursor-pointer animate-in fade-in duration-500 px-4 text-center"
                              onClick={() => setShowCelebration(false)}>
                             <div className="fixed inset-0 pointer-events-none overflow-hidden">
-                                {confettiParticles.map((p) => (
-                                    <div key={p.id} className="absolute rounded-sm animate-confetti-fall"
-                                         style={{ 
-                                             backgroundColor: p.color, 
-                                             left: p.left, 
-                                             width: p.width, 
-                                             height: p.height, 
-                                             animationDuration: p.animationDuration, 
-                                             animationDelay: p.animationDelay, 
-                                             opacity: p.opacity, 
-                                             transform: p.transform 
-                                         }}
-                                    />
-                                ))}
+                                {confettiRender}
                             </div>
-                            
-                            <div className="relative flex flex-col items-center justify-center w-full max-w-2xl transform scale-75 sm:scale-100">
-                                <div className="relative flex items-center justify-center w-56 h-56 md:w-72 md:h-72 mb-6">
+                            <div className="relative flex flex-col items-center justify-center w-full max-w-2xl transform scale-75 sm:scale-100 mt-10">
+                                <div className="relative flex items-center justify-center w-48 h-48 md:w-64 md:h-64 mb-8">
+                                    <div className="absolute inset-[-50%] bg-[radial-gradient(circle,rgba(250,204,21,0.5)_0%,rgba(250,204,21,0)_60%)] animate-pulse pointer-events-none z-0" />
                                     <RoyalRays />
-                                    <div className="absolute inset-0 bg-yellow-400 blur-[60px] opacity-50 animate-pulse" />
-                                    <div className="absolute inset-0 flex items-center justify-center z-[160]">
-                                        <Icon name="Crown" className="w-24 h-24 sm:w-32 sm:h-32 md:w-40 md:h-40 text-yellow-400 drop-shadow-[0_0_40px_rgba(250,204,21,1)] animate-bounce" strokeWidth={1.5} />
+                                    <div className="absolute inset-0 flex items-center justify-center z-10">
+                                        <Icon name="Crown" className="w-32 h-32 md:w-44 md:h-44 text-yellow-400 drop-shadow-[0_10px_20px_rgba(250,204,21,0.6)] animate-bounce" strokeWidth={2} />
                                     </div>
                                 </div>
-                                
                                 <div className="relative z-[160] bg-gradient-to-r from-yellow-300 via-orange-500 to-yellow-300 p-1 rounded-[3rem] shadow-2xl">
                                     <div className="bg-white px-10 py-12 rounded-[2.8rem] flex flex-col items-center overflow-hidden text-center">
                                         <h2 className="text-4xl sm:text-6xl font-black italic text-orange-600 mb-2 whitespace-nowrap">任務達成!!</h2>
@@ -711,181 +905,401 @@
                         </div>
                     )}
 
-                    <div className="main-card p-1.5 md:p-4 lg:p-6 relative overflow-hidden">
+                    <div className="main-card p-1.5 md:p-3 lg:p-6 relative overflow-hidden">
                         
-                        <div className="flex justify-center mb-2 flex-shrink-0">
-                            <div className="bg-white/80 backdrop-blur-sm p-1 rounded-xl shadow-sm border border-slate-200 flex gap-1 items-center">
-                                <button onClick={() => { setMode('kid'); setIsManageOpen(false); }}
-                                    className={`px-6 py-1.5 rounded-lg text-xs font-bold transition-all ${mode === 'kid' ? 'bg-orange-500 text-white shadow-md' : 'text-slate-400 hover:text-orange-300'}`}>
+                        <div className="flex justify-center mb-2 flex-shrink-0 z-10 relative">
+                            <div className="bg-white/90 backdrop-blur-sm p-1 rounded-xl shadow-sm border border-slate-200 flex gap-1 items-center">
+                                <button onClick={() => { setMode('kid'); setParentTab('log'); }}
+                                    className={`px-6 py-1.5 rounded-lg text-xs font-bold transition-all ${mode === 'kid' ? 'bg-orange-500 text-white shadow-md' : 'text-slate-400 hover:text-orange-400'}`}>
                                     洋洋模式
                                 </button>
                                 <button onClick={() => setMode('parent')}
-                                    className={`px-6 py-1.5 rounded-lg text-xs font-bold transition-all ${mode === 'parent' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400 hover:text-indigo-300'}`}>
+                                    className={`px-6 py-1.5 rounded-lg text-xs font-bold transition-all ${mode === 'parent' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400 hover:text-indigo-400'}`}>
                                     皇室管理
                                 </button>
                             </div>
                         </div>
 
-                        <div className={`bg-white rounded-[2rem] md:rounded-[3.5rem] shadow-xl overflow-hidden border-b-[10px] main-card transition-all duration-500 flex flex-col ${mode === 'kid' ? 'border-orange-400' : 'border-indigo-600'}`}>
+                        <div className={`bg-white rounded-[2rem] md:rounded-[3.5rem] shadow-xl overflow-hidden border-b-[10px] main-card transition-all duration-500 flex flex-col relative ${mode === 'kid' ? 'border-orange-400' : 'border-indigo-800'}`}>
                             
-                            <div className={`px-6 py-4 md:px-10 md:py-8 text-white relative flex-shrink-0 transition-colors duration-1000 ${mode === 'kid' ? 'bg-gradient-to-br from-orange-400 via-rose-400 to-rose-500 shadow-inner' : 'bg-gradient-to-br from-indigo-600 to-blue-700'}`}>
-                                <div className="flex justify-between items-start mb-4">
-                                   <div className="bg-white/20 backdrop-blur-md border border-white/30 px-5 py-2 rounded-2xl shadow-lg flex items-center gap-3">
-                                      <Icon name="Calendar" className="w-6 h-6 opacity-70" />
-                                      <h2 className="text-xl sm:text-2xl md:text-3xl font-black tracking-tighter drop-shadow-md">{formattedDate}</h2>
-                                   </div>
-                                </div>
-                                
-                                <div className="flex flex-row items-center justify-between gap-4">
-                                    <div className="flex-1">
-                                        <h1 className="text-3xl sm:text-5xl md:text-7xl font-black drop-shadow-md tracking-tighter leading-tight mb-3">{greetingText}</h1>
-                                        <div className="flex flex-col items-start gap-2">
-                                            <p className="text-sm sm:text-lg md:text-xl font-bold bg-black/10 px-6 py-2 rounded-2xl inline-flex items-center gap-2 backdrop-blur-sm shadow-inner">
-                                                {progress === 100 && currentTasks.length > 0 ? "🏆 完美的王者表現！" : `任務：${completedCount}/${currentTasks.length}`}
-                                            </p>
-                                            <p className="text-xs sm:text-sm md:text-base font-bold bg-white/20 px-4 py-1.5 rounded-xl inline-flex items-center gap-1.5 backdrop-blur-sm shadow-inner text-white drop-shadow-sm border border-white/20">
-                                                🔥 連續達標：{currentStreak} 天
-                                            </p>
+                            {/* 洋洋專屬模式 */}
+                            {mode === 'kid' && (
+                                <>
+                                    <div className="px-6 py-4 md:px-10 md:py-8 text-white relative flex-shrink-0 bg-gradient-to-br from-orange-400 via-rose-400 to-rose-500">
+                                        <div className="flex justify-between items-start mb-4">
+                                           <div className="bg-white/20 px-5 py-2 rounded-2xl shadow-sm flex items-center gap-3">
+                                              <Icon name="Calendar" className="w-6 h-6 opacity-70" />
+                                              <h2 className="text-xl sm:text-2xl md:text-3xl font-black tracking-tighter">{formattedDate}</h2>
+                                           </div>
+                                        </div>
+                                        
+                                        <div className="flex flex-row items-center justify-between gap-4">
+                                            <div className="flex-1">
+                                                <h1 className="text-3xl sm:text-5xl md:text-7xl font-black tracking-tighter leading-tight mb-3 drop-shadow-sm">{greetingText}</h1>
+                                                <div className="flex flex-col items-start gap-2">
+                                                    <p className="text-sm sm:text-lg md:text-xl font-bold bg-black/10 px-6 py-2 rounded-2xl inline-flex items-center gap-2">
+                                                        {progress === 100 && currentTasks.length > 0 ? "🏆 完美的王者表現！" : `任務：${completedCount}/${currentTasks.length}`}
+                                                    </p>
+                                                    <p className="text-sm sm:text-base md:text-lg font-bold bg-white/20 px-5 py-2 rounded-xl inline-flex items-center gap-2 text-white border border-white/30">
+                                                        🔥 連續達標：{currentStreak} 天
+                                                    </p>
+                                                </div>
+                                            </div>
+                                            <div className="flex-shrink-0 w-28 h-28 sm:w-36 sm:h-36 md:w-48 md:h-48 aspect-square flex items-center justify-center bg-white/10 rounded-full border-[6px] border-white/20 shadow-lg relative overflow-hidden group">
+                                                {progress === 100 ? (
+                                                    <div className="absolute inset-0 flex items-center justify-center z-10 animate-in zoom-in duration-500">
+                                                        <CustomNewTrophy color={dynamicColor} />
+                                                    </div>
+                                                ) : (
+                                                    <span className="absolute inset-0 flex items-center justify-center text-3xl sm:text-5xl md:text-7xl font-black z-10 text-white tracking-tighter">
+                                                        {progress}<span className="text-sm sm:text-xl ml-0.5 opacity-70">%</span>
+                                                    </span>
+                                                )}
+                                                <svg className="absolute inset-0 w-full h-full -rotate-90 p-0" viewBox="0 0 100 100">
+                                                    <circle cx="50" cy="50" r="44" fill="transparent" stroke="rgba(255,255,255,0.1)" strokeWidth="8" />
+                                                    <circle cx="50" cy="50" r="44" fill="transparent" stroke={dynamicColor} strokeWidth="8" strokeDasharray="276.46" strokeDashoffset={`${276.46 - (276.46 * progress / 100)}`} strokeLinecap="round" className="transition-all duration-1000 ease-in-out shadow-sm" />
+                                                </svg>
+                                            </div>
                                         </div>
                                     </div>
-                                    
-                                    <div className="flex-shrink-0 w-28 h-28 sm:w-36 sm:h-36 md:w-48 md:h-48 aspect-square flex items-center justify-center bg-white/10 rounded-full border-[6px] border-white/20 shadow-xl backdrop-blur-md relative overflow-hidden group">
-                                        {progress === 100 ? (
-                                            <div className="absolute inset-0 flex items-center justify-center z-10 animate-in zoom-in duration-500">
-                                                <CustomNewTrophy color={dynamicColor} />
-                                            </div>
-                                        ) : (
-                                            <span className="absolute inset-0 flex items-center justify-center text-3xl sm:text-5xl md:text-7xl font-black z-10 text-white drop-shadow-md tracking-tighter">
-                                                {progress}<span className="text-sm sm:text-xl ml-0.5 opacity-70">%</span>
-                                            </span>
-                                        )}
-                                        <svg className="absolute inset-0 w-full h-full -rotate-90 p-0" viewBox="0 0 100 100">
-                                            <circle cx="50" cy="50" r="44" fill="transparent" stroke="rgba(255,255,255,0.05)" strokeWidth="8" />
-                                            <circle cx="50" cy="50" r="44" fill="transparent" stroke={dynamicColor} strokeWidth="8" strokeDasharray="276.46" strokeDashoffset={`${276.46 - (276.46 * progress / 100)}`} strokeLinecap="round" className="transition-all duration-1000 ease-in-out shadow-lg" />
-                                        </svg>
+
+                                    <div className="flex justify-around px-4 py-3 md:px-10 md:py-6 bg-white border-b border-slate-50 no-scrollbar gap-1 flex-shrink-0">
+                                        {daysWithDates.map((day) => (
+                                            <button key={day.id} onClick={() => setSelectedDay(day.id)}
+                                                className={`flex-shrink-0 w-16 h-18 sm:w-20 sm:h-24 md:w-32 md:h-36 rounded-2xl md:rounded-[2.5rem] flex flex-col items-center justify-center transition-all duration-300 ${
+                                                    selectedDay === day.id ? 'bg-orange-500 text-white shadow-lg scale-105' : 'text-slate-300 hover:bg-slate-50'
+                                                }`}>
+                                                <span className={`text-[12px] md:text-[22px] font-black mb-1 opacity-90 ${selectedDay === day.id ? 'text-white' : 'text-slate-500'}`}>{day.dateStr}</span>
+                                                <span className="text-xl md:text-4xl font-black tracking-tighter">{day.label}</span>
+                                                {day.id === realDayOfWeek && <div className={`w-2 h-2 rounded-full mt-1.5 ${selectedDay === day.id ? 'bg-white' : 'bg-orange-400'}`} />}
+                                            </button>
+                                        ))}
                                     </div>
-                                </div>
-                            </div>
 
-                            <div className="flex justify-around px-4 py-3 md:px-10 md:py-6 bg-white border-b border-slate-50 no-scrollbar gap-1 flex-shrink-0">
-                                {daysWithDates.map((day) => (
-                                    <button key={day.id} onClick={() => setSelectedDay(day.id)}
-                                        className={`flex-shrink-0 w-16 h-18 sm:w-20 sm:h-24 md:w-32 md:h-36 rounded-2xl md:rounded-[2.5rem] flex flex-col items-center justify-center transition-all duration-300 ${
-                                            selectedDay === day.id ? (mode === 'kid' ? 'bg-orange-500 text-white shadow-lg scale-105' : 'bg-indigo-600 text-white shadow-lg scale-105') : 'text-slate-300 hover:bg-slate-50'
-                                        }`}>
-                                        <span className={`text-[12px] md:text-[22px] font-black mb-1 opacity-90 ${selectedDay === day.id ? 'text-white' : 'text-slate-500'}`}>
-                                            {day.dateStr}
-                                        </span>
-                                        <span className="text-xl md:text-4xl font-black tracking-tighter">{day.label}</span>
-                                        {day.id === realDayOfWeek && <div className={`w-2 h-2 rounded-full mt-1.5 ${selectedDay === day.id ? 'bg-white' : 'bg-orange-400'}`} />}
-                                    </button>
-                                ))}
-                            </div>
-
-                            <div className="scrollable-area no-scrollbar p-3 md:p-8 touch-pan-y bg-slate-50/50">
-                                {(mode === 'kid' || !isManageOpen) && (
-                                    <div ref={kidListRef} className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-6 relative">
-                                        {currentTasks.length > 0 ? (
-                                            currentTasks.map((task) => (
-                                                <div key={task.id} onClick={() => toggleItem(task.id)}
-                                                    className={`h-full cursor-pointer transition-all duration-300 origin-center ${
-                                                        teleportingCards[task.id] ? 'scale-50 opacity-0' : 'scale-100 opacity-100'
-                                                    }`}
-                                                >
-                                                    <div className={`h-full border-2 p-5 md:p-8 rounded-[2rem] md:rounded-[3rem] flex items-center gap-4 transition-all duration-300 ${
-                                                        celebratingCards[task.id] 
-                                                            ? 'bg-white animate-happy-dance' 
-                                                            : checkedItems[task.id] && !teleportingCards[task.id]
-                                                                ? 'bg-slate-100/60 border-slate-200/50 opacity-60 grayscale-[40%]' 
-                                                                : (mode === 'kid' && selectedDay !== realDayOfWeek) 
-                                                                    ? 'bg-slate-50 border-transparent opacity-30 cursor-not-allowed' 
-                                                                    : 'bg-white border-slate-100 shadow-sm hover:shadow-md hover:border-orange-100' 
-                                                    }`}>
-                                                        <div className="flex-shrink-0 relative">
-                                                            {celebratingCards[task.id] && <MagicSparkles />}
-                                                            
-                                                            {checkedItems[task.id] ? (
-                                                                <div className="bg-emerald-500 rounded-2xl p-4 shadow-lg animate-stamp relative z-10"><Icon name="CheckCircle2" className="w-8 h-8 text-white" /></div>
-                                                            ) : (
-                                                                <div className={`w-14 h-14 rounded-2xl border-[8px] transition-all duration-300 relative z-10 ${mode === 'kid' ? 'border-orange-50' : 'border-indigo-50'}`} />
-                                                            )}
+                                    <div className="scrollable-area no-scrollbar p-3 md:p-8 touch-pan-y bg-slate-50/50">
+                                        <div ref={kidListRef} className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-6 relative">
+                                            {currentTasks.length > 0 ? (
+                                                currentTasks.map((task) => (
+                                                    <div key={task.id} onClick={() => toggleItem(task.id)}
+                                                        className={`h-full cursor-pointer transition-all duration-300 origin-center ${teleportingCards[task.id] ? 'scale-50 opacity-0' : 'scale-100 opacity-100'}`}
+                                                    >
+                                                        <div className={`task-inner h-full border-2 p-5 md:p-8 rounded-[2rem] md:rounded-[3rem] flex items-center gap-4 transition-all duration-300 ${
+                                                            celebratingCards[task.id] 
+                                                                ? 'bg-white animate-happy-dance' 
+                                                                : checkedItems[task.id] && !teleportingCards[task.id]
+                                                                    ? 'bg-slate-100/60 border-slate-200/50 opacity-60'
+                                                                    : isFutureDate
+                                                                        ? 'bg-slate-50 border-transparent opacity-40 cursor-not-allowed' 
+                                                                        : 'bg-white border-slate-100 shadow-sm hover:shadow-md hover:border-orange-100' 
+                                                        }`}>
+                                                            <div className="flex-shrink-0 relative">
+                                                                {celebratingCards[task.id] && <MagicSparkles />}
+                                                                {checkedItems[task.id] ? (
+                                                                    <div className="bg-emerald-500 rounded-2xl p-4 shadow-lg animate-stamp relative z-10"><Icon name="CheckCircle2" className="w-8 h-8 text-white" /></div>
+                                                                ) : (
+                                                                    <div className="w-14 h-14 rounded-2xl border-[8px] transition-all duration-300 relative z-10 border-orange-50" />
+                                                                )}
+                                                            </div>
+                                                            <div className="flex-1 overflow-hidden text-left">
+                                                              <p className={`text-base sm:text-xl md:text-3xl font-black leading-snug tracking-tighter break-words transition-all duration-300 ${
+                                                                  checkedItems[task.id] && !celebratingCards[task.id] && !teleportingCards[task.id] ? 'text-slate-400' : 'text-slate-800'
+                                                              }`}>
+                                                                {task.title}
+                                                              </p>
+                                                            </div>
                                                         </div>
-                                                        <div className="flex-1 overflow-hidden text-left">
-                                                          <p className={`text-base sm:text-xl md:text-3xl font-black leading-snug tracking-tighter break-words transition-all duration-300 ${
-                                                              checkedItems[task.id] && !celebratingCards[task.id] && !teleportingCards[task.id]
-                                                                  ? 'text-slate-400 opacity-70' 
-                                                                  : 'text-slate-800'
-                                                          }`}>
-                                                            {task.title}
-                                                          </p>
+                                                    </div>
+                                                ))
+                                            ) : (
+                                                <div className="col-span-full py-16 text-center opacity-30">
+                                                    <Icon name="Heart" className="w-16 h-16 text-yellow-500 mx-auto mb-4 animate-pulse" />
+                                                    <h3 className="text-2xl font-black tracking-tighter text-center">今日休息萬歲！🏖️</h3>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                </>
+                            )}
+
+                            {/* 皇室管理模式 */}
+                            {mode === 'parent' && (
+                                <div className="flex flex-col h-full bg-indigo-50/30 relative">
+                                    <div className="bg-slate-800 px-6 py-4 md:px-8 md:py-6 text-white shrink-0 flex items-center justify-between z-20 shadow-md">
+                                        <div>
+                                            <div className="flex items-center gap-2 mb-1">
+                                                <Icon name="Settings2" className="w-6 h-6 md:w-8 md:h-8 text-indigo-400" />
+                                                <h2 className="text-xl md:text-2xl font-black tracking-wider">系統管理與設定</h2>
+                                            </div>
+                                            <p className="text-slate-400 text-xs font-bold pl-8 md:pl-10">家長專屬：掌握進度與發放獎勵</p>
+                                        </div>
+                                    </div>
+
+                                    <div className="flex px-4 md:px-6 pt-4 gap-2 border-b border-indigo-200 z-10 relative bg-slate-50 shrink-0">
+                                        <button onClick={() => setParentTab('log')}
+                                            className={`flex-1 max-w-[140px] px-2 py-3 rounded-t-xl font-black text-sm md:text-base transition-all ${parentTab === 'log' ? 'bg-white text-indigo-700 shadow-[0_-4px_10px_rgba(0,0,0,0.05)] translate-y-[1px]' : 'bg-indigo-100 text-indigo-400 hover:bg-indigo-200 hover:text-indigo-600 border-b border-indigo-200'}`}>
+                                            月曆補登
+                                        </button>
+                                        <button onClick={() => setParentTab('rewards')}
+                                            className={`flex-1 max-w-[140px] px-2 py-3 rounded-t-xl font-black text-sm md:text-base transition-all ${parentTab === 'rewards' ? 'bg-white text-indigo-700 shadow-[0_-4px_10px_rgba(0,0,0,0.05)] translate-y-[1px]' : 'bg-indigo-100 text-indigo-400 hover:bg-indigo-200 hover:text-indigo-600 border-b border-indigo-200'}`}>
+                                            獎勵紀錄
+                                        </button>
+                                        <button onClick={() => setParentTab('manage')}
+                                            className={`flex-1 max-w-[140px] px-2 py-3 rounded-t-xl font-black text-sm md:text-base transition-all ${parentTab === 'manage' ? 'bg-white text-indigo-700 shadow-[0_-4px_10px_rgba(0,0,0,0.05)] translate-y-[1px]' : 'bg-indigo-100 text-indigo-400 hover:bg-indigo-200 hover:text-indigo-600 border-b border-indigo-200'}`}>
+                                            作息維護
+                                        </button>
+                                    </div>
+
+                                    <div className="bg-white flex-1 rounded-b-2xl md:rounded-b-[3.5rem] shadow-inner overflow-y-auto p-4 md:p-6 -mt-px relative z-0">
+                                        
+                                        {parentTab === 'log' && (
+                                            <div className="max-w-2xl mx-auto space-y-4">
+                                                <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
+                                                    <div className="bg-indigo-50/50 px-4 py-3 border-b border-indigo-100 flex justify-between items-center">
+                                                        <h3 className="font-black text-indigo-900 flex items-center gap-2"><Icon name="Calendar" className="w-5 h-5"/>進度補登</h3>
+                                                        <div className="flex items-center gap-3 bg-white px-2 py-1 rounded-lg border border-indigo-100 shadow-sm">
+                                                            <button onClick={() => {setParentMonthOffset(p => p - 1); setSelectedLogDateStr(null);}} className="p-1 hover:bg-indigo-50 rounded text-indigo-600"><Icon name="ChevronLeft" className="w-5 h-5"/></button>
+                                                            <span className="font-bold text-sm w-20 text-center text-slate-700">{parentCalendarData.year} / {String(parentCalendarData.month).padStart(2, '0')}</span>
+                                                            <button onClick={() => {setParentMonthOffset(p => p + 1); setSelectedLogDateStr(null);}} className="p-1 hover:bg-indigo-50 rounded text-indigo-600"><Icon name="ChevronRight" className="w-5 h-5"/></button>
+                                                        </div>
+                                                    </div>
+                                                    <div className="p-4">
+                                                        <div className="grid grid-cols-7 gap-1 text-center mb-2">
+                                                            {['一','二','三','四','五','六','日'].map(d => <div key={d} className="text-xs font-bold text-slate-400">{d}</div>)}
+                                                        </div>
+                                                        <div className="grid grid-cols-7 gap-1 md:gap-2">
+                                                            {parentCalendarData.data.map((day, idx) => (
+                                                                day ? (
+                                                                    <div key={day.dateStr}
+                                                                         onClick={() => setSelectedLogDateStr(day.dateStr === selectedLogDateStr ? null : day.dateStr)}
+                                                                         className={`aspect-[4/3] flex flex-col items-center justify-center rounded-xl border relative transition-all cursor-pointer hover:shadow-md 
+                                                                         ${selectedLogDateStr === day.dateStr ? 'ring-4 ring-indigo-400 scale-105 z-10 bg-indigo-50 border-indigo-300' : 
+                                                                           day.uncompleted > 0 ? 'bg-red-50 border-red-200 hover:bg-red-100' : 
+                                                                           day.total > 0 ? 'bg-emerald-50 border-emerald-100 opacity-80 hover:opacity-100' : 'bg-slate-50 border-slate-100 opacity-50'}
+                                                                         ${day.dateStr === getYYYYMMDD(realToday) && selectedLogDateStr !== day.dateStr ? 'border-indigo-400 border-2' : ''}`}>
+                                                                        
+                                                                        <span className={`text-sm md:text-base font-black ${day.uncompleted > 0 ? 'text-red-900' : 'text-slate-500'}`}>{day.date}</span>
+                                                                        {day.uncompleted > 0 && (
+                                                                            <span className="text-[10px] font-black text-white bg-red-500 px-1.5 py-0.5 rounded shadow-sm mt-0.5 truncate max-w-[90%]">
+                                                                                {day.uncompleted} 未完
+                                                                            </span>
+                                                                        )}
+                                                                        {day.uncompleted === 0 && day.total > 0 && (
+                                                                            <div className="absolute inset-0 flex items-center justify-center bg-emerald-50/60 rounded-xl">
+                                                                                <Icon name="CheckCircle2" className="w-8 h-8 md:w-10 md:h-10 text-emerald-500 drop-shadow-sm" strokeWidth={3} />
+                                                                            </div>
+                                                                        )}
+                                                                        {day.total === 0 && <span className="text-[10px] text-slate-400 mt-1 font-bold">放假</span>}
+                                                                    </div>
+                                                                ) : <div key={`pad-${idx}`} className="aspect-[4/3]" />
+                                                            ))}
                                                         </div>
                                                     </div>
                                                 </div>
-                                            ))
-                                        ) : (
-                                            <div className="col-span-full py-16 text-center opacity-30">
-                                                <Icon name="Heart" className="w-16 h-16 text-yellow-500 mx-auto mb-4 animate-pulse" />
-                                                <h3 className="text-2xl font-black tracking-tighter text-center">今日休息萬歲！🏖️</h3>
+
+                                                {selectedLogDayObj && (
+                                                    <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 md:p-6 shadow-inner relative animate-slide-down">
+                                                        <div className="flex justify-between items-center mb-4 border-b border-slate-200 pb-2">
+                                                            <h4 className="font-black text-indigo-900 text-lg flex items-center gap-2">
+                                                                <Icon name="Calendar" className="w-5 h-5 text-indigo-500"/> {selectedLogDayObj.dateStr} 任務清單
+                                                            </h4>
+                                                            <button onClick={() => setSelectedLogDateStr(null)} className="text-slate-400 hover:text-slate-600 bg-white border border-slate-200 rounded-full w-8 h-8 flex items-center justify-center shadow-sm"><Icon name="X" className="w-5 h-5"/></button>
+                                                        </div>
+                                                        
+                                                        <div ref={logListRef} className="space-y-2">
+                                                            {logDayTasks.length > 0 ? (
+                                                                logDayTasks.map(task => {
+                                                                    const isChecked = selectedLogDayObj.checkedData[task.id];
+                                                                    const isAnimating = animatingLogTasks[task.id];
+                                                                    return (
+                                                                        <div key={task.id} onClick={() => !isAnimating && handleLogTask(task.id, selectedLogDayObj)}
+                                                                             className={`p-3 md:p-4 border-2 rounded-xl flex items-center justify-between cursor-pointer transition-all shadow-sm ${
+                                                                                 isChecked 
+                                                                                 ? (isAnimating === 'unchecking' ? 'bg-red-50 border-red-300 scale-[0.98]' : 'border-slate-200 bg-slate-50/50 opacity-60 hover:opacity-100 hover:bg-slate-100 active:scale-95') 
+                                                                                 : (isAnimating === 'checking' ? 'bg-emerald-50 border-emerald-300 scale-[0.98]' : 'border-red-200 bg-white hover:bg-red-50 hover:border-red-300 active:scale-95')
+                                                                             }`}>
+                                                                            <span className={`font-bold transition-colors ${isChecked && !isAnimating ? 'text-slate-500 line-through' : 'text-slate-800'}`}>{task.title}</span>
+                                                                            <div className={`shrink-0 w-6 h-6 md:w-8 md:h-8 rounded-full border-2 flex items-center justify-center transition-colors ${
+                                                                                isChecked 
+                                                                                ? (isAnimating === 'unchecking' ? 'border-red-300 bg-red-50' : 'border-emerald-500 bg-emerald-500') 
+                                                                                : (isAnimating === 'checking' ? 'border-emerald-500 bg-emerald-500' : 'border-slate-300 bg-slate-100')
+                                                                            }`}>
+                                                                                {isChecked && !isAnimating ? <Icon name="CheckCircle2" className="w-4 h-4 md:w-5 md:h-5 text-white" /> : 
+                                                                                 (!isChecked && isAnimating === 'checking' ? <Icon name="CheckCircle2" className="w-4 h-4 md:w-5 md:h-5 text-white animate-check-pop" /> : null)}
+                                                                            </div>
+                                                                        </div>
+                                                                    );
+                                                                })
+                                                            ) : (
+                                                                <div className="text-center py-6 text-slate-400 font-bold bg-white rounded-xl border border-slate-200 shadow-sm">此日無安排任務，自動視為達標。</div>
+                                                            )}
+                                                            {logDayTasks.length > 0 && selectedLogDayObj.uncompleted === 0 && (
+                                                                <div className="text-center pt-4 text-emerald-600 font-bold text-sm">🎉 本日任務已全數完成！</div>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                )}
                                             </div>
                                         )}
-                                    </div>
-                                )}
 
-                                {mode === 'parent' && (
-                                    <div className="space-y-6">
-                                        <div className="flex justify-between items-center bg-indigo-50 p-6 rounded-3xl border border-indigo-100 shadow-sm">
-                                            <div className="flex items-center gap-3 text-indigo-900 font-black text-xl italic">
-                                                <Icon name="Settings2" className="w-8 h-8 text-indigo-400" /> 皇室設定
-                                            </div>
-                                            <button onClick={() => {setIsManageOpen(!isManageOpen); setDeleteConfirmId(null);}} className="bg-indigo-600 text-white px-8 py-2.5 rounded-xl font-black shadow-lg hover:bg-indigo-700 transition-all text-sm">
-                                                {isManageOpen ? '完成設定' : '修改清單'}
-                                            </button>
-                                        </div>
-
-                                        {isManageOpen && (
-                                            <div className="space-y-4">
-                                                <button onClick={addTask} className="w-full py-8 border-2 border-dashed border-indigo-200 rounded-3xl text-indigo-400 font-black text-lg hover:bg-indigo-50 flex items-center justify-center gap-4 transition-all">
-                                                    <Icon name="Plus" className="w-8 h-8" /> 新增一個王者作息
-                                                </button>
+                                        {parentTab === 'rewards' && (
+                                            <div className="max-w-2xl mx-auto space-y-6">
                                                 
-                                                <div ref={manageListRef} className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-6">
-                                                    {allTasks.map((task) => (
-                                                        <div 
-                                                            key={task.id} 
-                                                            data-id={task.id}
-                                                            className={`task-item h-full`}
-                                                        >
-                                                            <div className="task-inner h-full bg-white border-2 border-slate-100 p-5 md:p-8 rounded-[2rem] md:rounded-[3rem] shadow-sm flex flex-col justify-center relative overflow-hidden">
-                                                                {deleteConfirmId === task.id && (
-                                                                    <div className="absolute inset-0 bg-red-600/95 z-20 flex flex-col items-center justify-center p-4 text-white">
-                                                                        <p className="font-black text-lg mb-4">確定刪除？</p>
-                                                                        <div className="flex gap-4 w-full px-6 justify-center">
-                                                                            <button onClick={() => confirmRemoveTask(task.id)} className="flex-1 bg-white text-red-600 py-2 rounded-xl font-black shadow-xl">刪除</button>
-                                                                            <button onClick={() => setDeleteConfirmId(null)} className="flex-1 bg-red-800 text-white py-2 rounded-xl font-black border border-red-400">取消</button>
-                                                                        </div>
+                                                <div className="bg-gradient-to-br from-indigo-50 to-blue-50 p-5 md:p-6 rounded-2xl border border-indigo-100 shadow-sm relative overflow-hidden">
+                                                    <div className="absolute top-0 right-0 p-4 opacity-10 pointer-events-none"><Icon name="Trophy" className="w-24 h-24 text-indigo-900" /></div>
+                                                    <h3 className="font-black text-indigo-900 mb-4 flex items-center gap-2 relative z-10"><Icon name="Star" className="w-5 h-5 text-indigo-500"/> 本期任務達標進度</h3>
+                                                    
+                                                    <div className="flex flex-col gap-4 relative z-10">
+                                                        <div className="bg-white/80 backdrop-blur-sm p-4 rounded-xl shadow-sm border border-slate-100">
+                                                            <div className="flex justify-between items-end mb-2">
+                                                                <p className="font-bold text-slate-700 flex items-center gap-2"><Icon name="Calendar" className="w-4 h-4 text-emerald-500"/> 本週進度 (週一至週日)</p>
+                                                                <p className="text-sm font-black text-emerald-600">{currentWeekProgress} / 7 天</p>
+                                                            </div>
+                                                            <div className="w-full bg-slate-200 rounded-full h-3 mb-1 overflow-hidden">
+                                                                <div className="bg-emerald-400 h-full rounded-full transition-all duration-1000" style={{ width: `${Math.round((currentWeekProgress/7)*100)}%` }}></div>
+                                                            </div>
+                                                        </div>
+                                                        <div className="bg-white/80 backdrop-blur-sm p-4 rounded-xl shadow-sm border border-slate-100">
+                                                            <div className="flex justify-between items-end mb-2">
+                                                                <p className="font-bold text-slate-700 flex items-center gap-2"><Icon name="Crown" className="w-4 h-4 text-orange-500"/> 本月進度 (1號至月底)</p>
+                                                                <p className="text-sm font-black text-orange-500">{currentMonthProgress.count} / {currentMonthProgress.total} 天</p>
+                                                            </div>
+                                                            <div className="w-full bg-slate-200 rounded-full h-3 mb-1 overflow-hidden">
+                                                                <div className="bg-orange-400 h-full rounded-full transition-all duration-1000" style={{ width: `${Math.round((currentMonthProgress.count/currentMonthProgress.total)*100)}%` }}></div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                <div>
+                                                    <h3 className="font-black text-slate-700 border-b border-slate-200 pb-2 mb-3">💎 可兌換的獎勵清單</h3>
+                                                    {unclaimedRewards.length > 0 ? (
+                                                        <div className="space-y-3">
+                                                            {unclaimedRewards.map(reward => (
+                                                                <div key={reward.periodId} className={`p-4 rounded-xl border flex flex-col gap-3 shadow-sm ${reward.type === 'monthly' ? 'bg-orange-50 border-orange-200' : 'bg-emerald-50 border-emerald-200'}`}>
+                                                                    <div className="flex justify-between items-center">
+                                                                        <span className={`font-black flex items-center gap-1 ${reward.type === 'monthly' ? 'text-orange-800' : 'text-emerald-800'}`}>
+                                                                            <Icon name={reward.type === 'monthly' ? 'Crown' : 'Gift'} className="w-4 h-4" />
+                                                                            {reward.label}
+                                                                        </span>
                                                                     </div>
-                                                                )}
-                                                                
-                                                                <div className="flex items-center gap-4 mb-4">
-                                                                    <div className="flex-shrink-0 relative">
-                                                                        <div className={`w-14 h-14 rounded-2xl border-[4px] border-indigo-50 bg-indigo-50/50 flex items-center justify-center drag-handle touch-none cursor-grab text-slate-400 hover:text-indigo-600 hover:bg-indigo-100 transition-colors`}>
-                                                                            <Icon name="GripVertical" className="w-8 h-8 pointer-events-none" />
-                                                                        </div>
+                                                                    <div className="flex flex-col md:flex-row gap-2">
+                                                                        <input 
+                                                                            type="text" 
+                                                                            placeholder="輸入發放的獎品 (例: 買玩具、看電視)" 
+                                                                            value={pendingRewardsInputs[reward.periodId] || ''}
+                                                                            onChange={(e) => setPendingRewardsInputs(prev => ({...prev, [reward.periodId]: e.target.value}))}
+                                                                            onKeyDown={(e) => e.key === 'Enter' && handleClaimReward(reward)}
+                                                                            className="flex-1 px-3 py-2 rounded-lg border border-slate-300 outline-none focus:ring-2 focus:ring-indigo-300 font-bold"
+                                                                        />
+                                                                        <button onClick={() => handleClaimReward(reward)} className={`text-white px-4 py-2 rounded-lg font-black shadow-sm shrink-0 ${reward.type === 'monthly' ? 'bg-orange-500 hover:bg-orange-600' : 'bg-emerald-500 hover:bg-emerald-600'}`}>記錄已兌換</button>
                                                                     </div>
-                                                                    
-                                                                    <div className="flex-1 overflow-hidden">
-                                                                        <input value={task.title} onChange={(e) => updateTask(task.id, 'title', e.target.value)} className="w-full text-lg sm:text-xl md:text-2xl font-black bg-slate-50 border-none rounded-xl px-3 py-2 outline-none focus:ring-2 ring-indigo-200 text-left transition-shadow" placeholder="輸入作息..." />
-                                                                    </div>
-                                                                    
-                                                                    <button onClick={() => setDeleteConfirmId(task.id)} className="flex-shrink-0 p-3 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all">
-                                                                        <Icon name="Trash2" className="w-6 h-6" />
-                                                                    </button>
                                                                 </div>
-                                                                
-                                                                <div className="flex flex-wrap gap-1.5 justify-start pl-[4.5rem]">
-                                                                    {baseDays.map(d => (
-                                                                        <button key={d.id} onClick={() => toggleTaskRule(task.id, d.id)} className={`w-8 h-8 md:w-9 md:h-9 rounded-xl text-xs font-black transition-all ${task.rule.includes(d.id) ? 'bg-indigo-600 text-white shadow-md' : 'bg-slate-50 text-slate-400 hover:bg-slate-100'}`}>{d.label}</button>
-                                                                    ))}
+                                                            ))}
+                                                        </div>
+                                                    ) : (
+                                                        <div className="bg-slate-50 border border-slate-200 rounded-xl p-6 text-center text-slate-400 font-bold">
+                                                            目前沒有可兌換的獎勵，繼續保持努力！
+                                                        </div>
+                                                    )}
+                                                </div>
+
+                                                <div className="space-y-3 pt-2">
+                                                    <h3 className="font-black text-slate-700 border-b border-slate-200 pb-2 mb-4">歷史獎勵兌換紀錄</h3>
+                                                    {sortedRewardsHistory.length > 0 ? (
+                                                        sortedRewardsHistory.map((reward) => {
+                                                            const isValid = isPeriodFullyCompleted(reward.periodId);
+                                                            const isEditing = editingRewardId === reward.id;
+
+                                                            return (
+                                                                <div key={reward.id} className={`flex items-center justify-between bg-white border-2 p-4 rounded-xl shadow-sm transition-shadow group ${!isValid ? 'border-red-300 bg-red-50/50' : 'border-slate-200 hover:border-indigo-200'}`}>
+                                                                    <div className="flex flex-col flex-1 gap-2 overflow-hidden">
+                                                                        <div className="flex items-center gap-4 w-full">
+                                                                            <div className={`w-10 h-10 md:w-12 md:h-12 rounded-full flex items-center justify-center shrink-0 shadow-inner border-2 ${!isValid ? 'bg-red-50 text-red-500 border-red-100' : reward.type === 'monthly' ? 'bg-orange-50 text-orange-500 border-orange-100' : 'bg-emerald-50 text-emerald-500 border-emerald-100'}`}>
+                                                                                {!isValid ? <Icon name="AlertTriangle" className="w-5 h-5 md:w-6 md:h-6" /> : <Icon name={reward.type === 'monthly' ? 'Crown' : 'Gift'} className="w-5 h-5 md:w-6 md:h-6" />}
+                                                                            </div>
+                                                                            <div className="flex-1 overflow-hidden">
+                                                                                {isEditing ? (
+                                                                                    <div className="flex items-center gap-2 mb-1">
+                                                                                        <input 
+                                                                                            type="text" 
+                                                                                            value={editRewardTitle} 
+                                                                                            onChange={e => setEditRewardTitle(e.target.value)} 
+                                                                                            className="flex-1 px-2 py-1 border border-indigo-300 rounded outline-none focus:ring-2 focus:ring-indigo-400 font-bold text-slate-800 text-sm md:text-base"
+                                                                                            autoFocus
+                                                                                            onKeyDown={e => e.key === 'Enter' && saveEditReward()}
+                                                                                        />
+                                                                                        <button onClick={saveEditReward} className="bg-indigo-600 text-white px-3 py-1 rounded shadow-sm text-xs font-bold shrink-0">儲存</button>
+                                                                                        <button onClick={() => setEditingRewardId(null)} className="bg-slate-200 text-slate-600 px-3 py-1 rounded text-xs font-bold shrink-0">取消</button>
+                                                                                    </div>
+                                                                                ) : (
+                                                                                    <div className="flex flex-col md:flex-row md:items-center gap-1 md:gap-2 mb-0.5">
+                                                                                        <p className={`font-black text-base md:text-lg leading-tight truncate ${!isValid ? 'text-red-700 line-through opacity-70' : 'text-slate-800'}`}>{reward.title}</p>
+                                                                                        <span className={`text-[10px] px-2 py-0.5 rounded border font-bold inline-block w-max shrink-0 ${!isValid ? 'bg-red-100 text-red-600 border-red-200' : reward.type === 'monthly' ? 'bg-orange-100 text-orange-600 border-orange-200' : 'bg-emerald-100 text-emerald-600 border-emerald-200'}`}>
+                                                                                            {reward.periodLabel}
+                                                                                        </span>
+                                                                                    </div>
+                                                                                )}
+                                                                                {!isEditing && <p className="text-xs text-slate-400 font-bold flex items-center gap-1 truncate"><Icon name="Calendar" className="w-3 h-3 shrink-0"/> 兌換日期：{reward.date}</p>}
+                                                                                {!isValid && !isEditing && <p className="text-[10px] md:text-xs text-red-500 font-bold mt-1 animate-pulse flex items-center gap-1"><Icon name="AlertTriangle" className="w-3 h-3 shrink-0"/> 警告：該週期任務紀錄已被修改，達標失效！</p>}
+                                                                            </div>
+                                                                        </div>
+                                                                    </div>
+                                                                    {!isEditing && (
+                                                                        <div className="flex flex-col md:flex-row gap-1 shrink-0 ml-2">
+                                                                            <button onClick={() => startEditReward(reward)} className="p-2 text-slate-300 hover:text-indigo-500 hover:bg-indigo-50 rounded-lg transition-all opacity-100 md:opacity-0 group-hover:opacity-100">
+                                                                                <Icon name="Edit2" className="w-5 h-5" />
+                                                                            </button>
+                                                                            <button onClick={() => handleDeleteReward(reward.id)} className="p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all opacity-100 md:opacity-0 group-hover:opacity-100">
+                                                                                <Icon name="Trash2" className="w-5 h-5" />
+                                                                            </button>
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                            );
+                                                        })
+                                                    ) : (
+                                                        <div className="text-center py-10 text-slate-400 font-bold border-2 border-dashed border-slate-200 rounded-2xl bg-slate-50/50">
+                                                            <Icon name="Gift" className="w-10 h-10 mx-auto mb-2 opacity-30" />
+                                                            目前還沒有任何歷史紀錄喔！
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {parentTab === 'manage' && (
+                                            <div className="max-w-4xl mx-auto space-y-4">
+                                                <button onClick={addTask} className="w-full py-5 border-2 border-dashed border-indigo-300 rounded-2xl text-indigo-500 font-black text-base hover:bg-indigo-50 flex items-center justify-center gap-2 transition-all">
+                                                    <Icon name="Plus" className="w-5 h-5" /> 新增作息項目
+                                                </button>
+                                                <div ref={manageListRef} className="space-y-3">
+                                                    {allTasks.map((task) => (
+                                                        <div key={task.id} data-id={task.id} className="task-item bg-white border border-slate-200 p-3 md:p-4 rounded-xl shadow-sm flex flex-col relative overflow-hidden group">
+                                                            {deleteConfirmId === task.id && (
+                                                                <div className="absolute inset-0 bg-red-600/95 z-20 flex flex-col md:flex-row items-center justify-center p-4 text-white gap-4">
+                                                                    <p className="font-black text-base md:text-lg m-0">確定刪除此作息？</p>
+                                                                    <div className="flex gap-2">
+                                                                        <button onClick={() => confirmRemoveTask(task.id)} className="bg-white text-red-600 px-4 py-2 rounded-lg font-black shadow-md">刪除</button>
+                                                                        <button onClick={() => setDeleteConfirmId(null)} className="bg-red-800 text-white px-4 py-2 rounded-lg font-black border border-red-400">取消</button>
+                                                                    </div>
+                                                                </div>
+                                                            )}
+                                                            <div className="flex flex-col md:flex-row md:items-center gap-2 md:gap-4">
+                                                                <div className="flex items-center gap-2 flex-1">
+                                                                    <div className="w-8 h-8 rounded shrink-0 bg-slate-100 flex items-center justify-center drag-handle touch-none cursor-grab text-slate-400 hover:text-indigo-600 hover:bg-indigo-50">
+                                                                        <Icon name="GripVertical" className="w-5 h-5 pointer-events-none" />
+                                                                    </div>
+                                                                    <input value={task.title} onChange={(e) => updateTask(task.id, 'title', e.target.value)} className="flex-1 text-base md:text-lg font-bold bg-transparent border border-transparent hover:border-slate-200 focus:border-indigo-300 focus:bg-slate-50 rounded px-2 py-1 outline-none transition-all placeholder:text-slate-300" placeholder="輸入作息名稱" />
+                                                                </div>
+                                                                <div className="flex items-center justify-between md:justify-end gap-3 pl-10 md:pl-0">
+                                                                    <div className="flex gap-1">
+                                                                        {baseDays.map(d => (
+                                                                            <button key={d.id} onClick={() => toggleTaskRule(task.id, d.id)} className={`w-7 h-7 md:w-8 md:h-8 rounded text-[10px] md:text-xs font-black transition-all ${task.rule.includes(d.id) ? 'bg-indigo-600 text-white shadow-sm' : 'bg-slate-100 text-slate-400 hover:bg-slate-200'}`}>{d.label}</button>
+                                                                        ))}
+                                                                    </div>
+                                                                    <button onClick={() => setDeleteConfirmId(task.id)} className="p-1.5 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded shrink-0 transition-all md:opacity-0 group-hover:opacity-100">
+                                                                        <Icon name="Trash2" className="w-5 h-5" />
+                                                                    </button>
                                                                 </div>
                                                             </div>
                                                         </div>
@@ -894,14 +1308,9 @@
                                             </div>
                                         )}
                                     </div>
-                                )}
-                            </div>
-
-                            <div className="py-4 bg-slate-50 border-t border-slate-100 flex justify-center items-center flex-shrink-0">
-                                <div className="flex items-center gap-6 text-[10px] font-black text-slate-300 tracking-[0.6em] uppercase opacity-60 text-center">
-                                   YANG YANG ROYAL v54.0
                                 </div>
-                            </div>
+                            )}
+
                         </div>
                     </div>
                 </div>
