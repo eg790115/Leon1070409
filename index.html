@@ -40,13 +40,14 @@
       })();
     </script>
 
-    <!-- 載入 React、Tailwind 與 自動佈局動畫引擎 -->
+    <!-- 載入 React、Tailwind -->
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- 引入 AutoAnimate 來達成「圖卡被推擠開」的流暢特效 -->
-    <script src="https://cdn.jsdelivr.net/npm/@formkit/auto-animate@0.8.2/index.global.js"></script>
+    
+    <!-- 引入 SortableJS 來達成最流暢的原生級卡片推擠動畫 -->
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
 
     <style>
         /* 鎖定螢幕，達成全適應 App 體驗 */
@@ -94,9 +95,26 @@
         }
         .trophy-glow { filter: drop-shadow(0 0 15px rgba(250, 204, 21, 0.8)); }
         
-        /* 確保拖曳順暢，防止網頁反白或滾動干擾 */
+        /* --- SortableJS 拖曳專用特效 --- */
         .touch-none { touch-action: none; }
-        .drag-active { cursor: grabbing !important; }
+        
+        /* 拖曳時，原位置會留下一個淡色的坑位 (Placeholder) */
+        .sortable-ghost {
+            opacity: 0.3 !important;
+            background-color: #f8fafc !important;
+            border: 3px dashed #cbd5e1 !important;
+            transform: scale(0.98);
+        }
+        
+        /* 被拿起正在半空中的圖卡樣式 (漂浮、陰影、放大) */
+        .sortable-drag {
+            opacity: 1 !important;
+            cursor: grabbing !important;
+            transform: scale(1.03) !important;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25), 0 0 0 4px rgba(129, 140, 248, 0.5) !important;
+            border-color: #818cf8 !important;
+            z-index: 100 !important;
+        }
     </style>
 </head>
 <body>
@@ -245,28 +263,9 @@
             const [isManageOpen, setIsManageOpen] = useState(false);
             const [deleteConfirmId, setDeleteConfirmId] = useState(null);
             const [showCelebration, setShowCelebration] = useState(false);
-            const [draggedIndex, setDraggedIndex] = useState(null);
 
-            // Refs for auto-animate lists
-            const kidListRef = useRef(null);
+            // Refs
             const manageListRef = useRef(null);
-            const tasksRef = useRef(allTasks);
-
-            useEffect(() => { tasksRef.current = allTasks; }, [allTasks]);
-
-            // 初始化 AutoAnimate 以獲得「被推擠」的動畫感
-            useEffect(() => {
-                const applyAnimations = () => {
-                    if (window.autoAnimate) {
-                        if (kidListRef.current) window.autoAnimate(kidListRef.current, { duration: 300, easing: 'ease-out' });
-                        if (manageListRef.current) window.autoAnimate(manageListRef.current, { duration: 300, easing: 'ease-out' });
-                    }
-                };
-                applyAnimations();
-                // 確保套件加載完成後再次綁定
-                const timer = setTimeout(applyAnimations, 500);
-                return () => clearTimeout(timer);
-            }, [isManageOpen]);
 
             useEffect(() => {
                 const initTasks = async () => {
@@ -288,6 +287,39 @@
                 };
                 initProgress();
             }, [selectedDay]);
+
+            // 初始化 SortableJS 以達成超流暢的拖曳與推擠動畫
+            useEffect(() => {
+                let sortableInstance;
+                if (isManageOpen && manageListRef.current && window.Sortable) {
+                    sortableInstance = new window.Sortable(manageListRef.current, {
+                        animation: 250, // 動畫過渡時間 (毫秒)，越長越滑順
+                        easing: "cubic-bezier(0.25, 1, 0.5, 1)", 
+                        handle: '.drag-handle', // 限制只有點擊把手才能拖曳
+                        ghostClass: 'sortable-ghost',
+                        dragClass: 'sortable-drag',
+                        forceFallback: true, // 強制使用自定義樣式，關閉原生 HTML5 的半透明殘影
+                        fallbackClass: 'sortable-drag',
+                        fallbackOnBody: true, // 確保拖曳中的卡片層級(z-index)在最上方不受干擾
+                        onEnd: (evt) => {
+                            const { oldIndex, newIndex } = evt;
+                            if (oldIndex !== newIndex) {
+                                // 這裡安全地同步 React State
+                                setAllTasks(prev => {
+                                    const newTasks = [...prev];
+                                    const [moved] = newTasks.splice(oldIndex, 1);
+                                    newTasks.splice(newIndex, 0, moved);
+                                    robustSave(STORAGE_KEYS.TASKS, STORAGE_KEYS.TASKS_BAK, newTasks);
+                                    return newTasks;
+                                });
+                            }
+                        }
+                    });
+                }
+                return () => {
+                    if (sortableInstance) sortableInstance.destroy();
+                };
+            }, [isManageOpen]);
 
             const currentTasks = useMemo(() => allTasks.filter(t => t.rule.includes(selectedDay)), [selectedDay, allTasks]);
             const completedCount = currentTasks.filter(t => checkedItems[t.id]).length;
@@ -352,51 +384,6 @@
                 robustSave(STORAGE_KEYS.TASKS, STORAGE_KEYS.TASKS_BAK, updated);
             };
 
-            // --- 統一指針事件 (解決電腦版 HTML5 Drag 阻擋 AutoAnimate 的問題) ---
-            const handlePointerDown = (e, index) => {
-                // 確保只回應滑鼠左鍵或觸控
-                if (e.pointerType === 'mouse' && e.button !== 0) return;
-                
-                setDraggedIndex(index);
-                document.body.style.overflow = 'hidden';
-                
-                // 鎖定指標捕捉，確保指標就算移到外面也能追蹤
-                try { e.target.setPointerCapture(e.pointerId); } catch(err) {}
-            };
-
-            const handlePointerMove = (e) => {
-                if (draggedIndex === null) return;
-                
-                // 透過座標找出指標下方的元素
-                const element = document.elementFromPoint(e.clientX, e.clientY);
-                if (!element) return;
-                
-                const listItem = element.closest('.task-item');
-                if (listItem) {
-                    const hoverIndex = Number(listItem.getAttribute('data-index'));
-                    if (!isNaN(hoverIndex) && hoverIndex !== draggedIndex) {
-                        // 當碰到不同的項目時交換陣列資料
-                        const updated = [...tasksRef.current];
-                        const temp = updated[draggedIndex];
-                        updated.splice(draggedIndex, 1);
-                        updated.splice(hoverIndex, 0, temp);
-                        
-                        setDraggedIndex(hoverIndex);
-                        setAllTasks(updated);
-                    }
-                }
-            };
-
-            const handlePointerUp = (e) => {
-                if (draggedIndex !== null) {
-                    setDraggedIndex(null);
-                    document.body.style.overflow = '';
-                    robustSave(STORAGE_KEYS.TASKS, STORAGE_KEYS.TASKS_BAK, tasksRef.current);
-                    
-                    try { e.target.releasePointerCapture(e.pointerId); } catch(err) {}
-                }
-            };
-
             const dynamicColor = useMemo(() => {
                 if (currentTasks.length === 0 || completedCount === 0) return "#94a3b8"; 
                 const ratio = completedCount / currentTasks.length;
@@ -427,12 +414,9 @@
                                 ))}
                             </div>
                             <div className="relative flex flex-col items-center justify-center w-full max-w-2xl transform scale-75 sm:scale-100">
-                                {/* 光線與皇冠 (重做版本，保證不變形) */}
                                 <div className="relative flex items-center justify-center w-56 h-56 md:w-72 md:h-72 mb-6">
-                                    {/* 純 CSS 旋轉光束 */}
                                     <div className="absolute inset-[-50%] sunburst-rays animate-[spin_10s_linear_infinite]" />
                                     <div className="absolute inset-0 bg-yellow-400 blur-[50px] opacity-40" />
-                                    {/* 絕對尺寸的皇冠，絕對不變形 */}
                                     <Icon name="Crown" className="relative z-[160] w-32 h-32 md:w-40 md:h-40 text-yellow-400 drop-shadow-[0_0_40px_rgba(250,204,21,1)] animate-bounce" strokeWidth={1.5} />
                                 </div>
                                 <div className="relative z-[160] bg-gradient-to-r from-yellow-300 via-orange-500 to-yellow-300 p-1 rounded-[3rem] shadow-2xl">
@@ -450,7 +434,7 @@
                         {/* 頂部切換 */}
                         <div className="flex justify-center mb-2 flex-shrink-0">
                             <div className="bg-white/80 backdrop-blur-sm p-1 rounded-xl shadow-sm border border-slate-200 flex gap-1 items-center">
-                                <button onClick={() => setMode('kid')}
+                                <button onClick={() => { setMode('kid'); setIsManageOpen(false); }}
                                     className={`px-6 py-1.5 rounded-lg text-xs font-bold transition-all ${mode === 'kid' ? 'bg-orange-500 text-white shadow-md' : 'text-slate-400 hover:text-orange-300'}`}>
                                     洋洋模式
                                 </button>
@@ -463,7 +447,7 @@
 
                         <div className={`bg-white rounded-[2rem] md:rounded-[3.5rem] shadow-xl overflow-hidden border-b-[10px] main-card transition-all duration-500 flex flex-col ${mode === 'kid' ? 'border-orange-400' : 'border-indigo-600'}`}>
                             
-                            {/* Header: 高度自適應 */}
+                            {/* Header */}
                             <div className={`px-6 py-4 md:px-10 md:py-8 text-white relative flex-shrink-0 transition-colors duration-1000 ${mode === 'kid' ? 'bg-gradient-to-br from-orange-400 via-rose-400 to-rose-500 shadow-inner' : 'bg-gradient-to-br from-indigo-600 to-blue-700'}`}>
                                 <div className="flex justify-between items-start mb-4">
                                    <div className="bg-white/20 backdrop-blur-md border border-white/30 px-5 py-2 rounded-2xl shadow-lg flex items-center gap-3">
@@ -480,10 +464,8 @@
                                         </p>
                                     </div>
                                     
-                                    {/* 圓環進度與獎盃 */}
                                     <div className="flex-shrink-0 w-28 h-28 sm:w-36 sm:h-36 md:w-48 md:h-48 aspect-square flex items-center justify-center bg-white/10 rounded-full border-[6px] border-white/20 shadow-xl backdrop-blur-md relative overflow-hidden group">
                                         {progress === 100 ? (
-                                            /* 獎盃：改為絕對定位+絕對尺寸，徹底解決變形問題 */
                                             <div className="absolute inset-0 flex items-center justify-center z-10 animate-in zoom-in duration-500">
                                                 <Icon name="Trophy" className="w-14 h-14 sm:w-16 sm:h-16 md:w-20 md:h-20 trophy-glow animate-bounce-fast" style={{ color: dynamicColor }} />
                                             </div>
@@ -518,8 +500,8 @@
 
                             {/* 任務清單區 */}
                             <div className="scrollable-area no-scrollbar p-3 md:p-8 touch-pan-y bg-slate-50/50">
-                                {!isManageOpen && (
-                                    <div ref={kidListRef} className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-6">
+                                {(mode === 'kid' || !isManageOpen) && (
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-6">
                                         {currentTasks.length > 0 ? (
                                             currentTasks.map((task) => (
                                                 <div key={task.id} onClick={() => toggleItem(task.id)}
@@ -570,16 +552,13 @@
                                                     <Icon name="Plus" className="w-8 h-8" /> 新增一個王者作息
                                                 </button>
                                                 
-                                                {/* 加載 AutoAnimate 的拖曳區域 */}
+                                                {/* 加載 SortableJS 的拖曳區域 */}
                                                 <div ref={manageListRef} className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-6">
-                                                    {allTasks.map((task, index) => (
+                                                    {allTasks.map((task) => (
                                                         <div 
                                                             key={task.id} 
-                                                            data-index={index}
-                                                            /* 移除傳統 Draggable，改用指標事件實現萬用流暢推擠 */
-                                                            className={`task-item bg-white border-2 p-5 md:p-8 rounded-[2rem] md:rounded-[3rem] shadow-sm flex flex-col justify-center relative overflow-hidden transition-all duration-300 ${
-                                                                draggedIndex === index ? 'opacity-95 scale-[1.02] -translate-y-1 ring-4 ring-indigo-400 shadow-2xl z-50 border-indigo-300' : 'border-slate-100 hover:border-indigo-100'
-                                                            }`}
+                                                            /* 確保卡片本身沒有會干擾拖拉物理效果的 transform 漸變，讓 SortableJS 全權控制動畫 */
+                                                            className={`task-item bg-white border-2 border-slate-100 p-5 md:p-8 rounded-[2rem] md:rounded-[3rem] shadow-sm flex flex-col justify-center relative overflow-hidden`}
                                                         >
                                                             {deleteConfirmId === task.id && (
                                                                 <div className="absolute inset-0 bg-red-600/95 z-20 flex flex-col items-center justify-center p-4 text-white rounded-[2rem] md:rounded-[3rem]">
@@ -593,14 +572,8 @@
                                                             
                                                             <div className="flex items-center gap-4 mb-4">
                                                                 <div className="flex-shrink-0 relative">
-                                                                    {/* 指標事件綁定在此處，統一支援滑鼠與觸控 */}
-                                                                    <div 
-                                                                        onPointerDown={(e) => handlePointerDown(e, index)}
-                                                                        onPointerMove={handlePointerMove}
-                                                                        onPointerUp={handlePointerUp}
-                                                                        onPointerCancel={handlePointerUp}
-                                                                        className={`w-14 h-14 rounded-2xl border-[4px] border-indigo-50 bg-indigo-50/50 flex items-center justify-center drag-handle touch-none cursor-grab text-slate-400 transition-colors ${draggedIndex === index ? 'drag-active text-indigo-600' : 'hover:text-indigo-600 hover:bg-indigo-100'}`}
-                                                                    >
+                                                                    {/* 拖曳把手 */}
+                                                                    <div className={`w-14 h-14 rounded-2xl border-[4px] border-indigo-50 bg-indigo-50/50 flex items-center justify-center drag-handle touch-none cursor-grab text-slate-400 hover:text-indigo-600 hover:bg-indigo-100 transition-colors`}>
                                                                         <Icon name="GripVertical" className="w-8 h-8 pointer-events-none" />
                                                                     </div>
                                                                 </div>
