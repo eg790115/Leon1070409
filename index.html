@@ -14,7 +14,7 @@
     <meta name="theme-color" content="#f97316">
     <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/1426/1426735.png">
 
-    <!-- 動態產生 PWA Manifest 繞過部分平板的嚴格限制 -->
+    <!-- 動態產生 PWA Manifest -->
     <link id="manifest-link" rel="manifest">
     <script>
       (function() {
@@ -40,13 +40,15 @@
       })();
     </script>
 
-    <!-- 載入 React、Tailwind -->
+    <!-- 載入 React、Tailwind 與 動畫引擎 -->
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     
-    <!-- 引入 SortableJS 來達成最流暢的原生級卡片推擠動畫 -->
+    <!-- 引入 AutoAnimate (負責打勾時的完美推擠與補位動畫) -->
+    <script src="https://cdn.jsdelivr.net/npm/@formkit/auto-animate@0.8.2/index.global.js"></script>
+    <!-- 引入 SortableJS (負責管理模式的編輯拖拉) -->
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
 
     <style>
@@ -95,35 +97,72 @@
         }
         .trophy-glow { filter: drop-shadow(0 0 15px rgba(250, 204, 21, 0.8)); }
         
-        /* --- SortableJS 拖曳專用特效 --- */
+        /* --- SortableJS 拖曳專用特效 (管理模式) --- */
         .touch-none { touch-action: none; }
+
+        .task-inner {
+            transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1), 
+                        box-shadow 0.4s ease, 
+                        opacity 0.4s ease, 
+                        background-color 0.4s ease,
+                        border-color 0.4s ease,
+                        filter 0.4s ease;
+            transform-origin: center center;
+        }
         
-        /* 拖曳時，原位置會留下一個明顯的「空洞坑位」 */
-        .sortable-ghost {
-            opacity: 1 !important;
-            background-color: #f1f5f9 !important;
+        .sortable-ghost { opacity: 1 !important; }
+        .sortable-ghost .task-inner {
+            background-color: #f8fafc !important;
             border: 3px dashed #cbd5e1 !important;
-            box-shadow: inset 0 4px 6px rgba(0, 0, 0, 0.05) !important;
+            box-shadow: inset 0 4px 10px rgba(0, 0, 0, 0.05) !important;
+            transform: scale(0.97) !important; 
         }
+        .sortable-ghost .task-inner > * { visibility: hidden !important; }
         
-        /* 關鍵修正：隱藏空位裡面的所有內容，消除「有兩張卡片」的錯覺 */
-        .sortable-ghost > * {
-            visibility: hidden !important;
-        }
-        
-        /* 被拿起正在半空中的圖卡樣式 (漂浮、陰影) */
         .sortable-drag {
             opacity: 1 !important;
             cursor: grabbing !important;
-            background-color: #ffffff !important;
-            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.3), 0 0 0 2px rgba(99, 102, 241, 0.5) !important;
-            border-radius: 2rem !important; 
             z-index: 9999 !important;
         }
-        @media (min-width: 768px) {
-            .sortable-drag {
-                border-radius: 3rem !important;
-            }
+        .sortable-drag .task-inner {
+            background-color: #ffffff !important;
+            box-shadow: 0 35px 60px -15px rgba(0, 0, 0, 0.35), 0 0 0 2px rgba(99, 102, 241, 0.6) !important;
+            border-color: transparent !important;
+            transform: scale(1.05) rotate(2deg) !important; 
+        }
+        
+        /* --- 洋洋模式：打勾彈出的跳動特效 --- */
+        @keyframes check-pop {
+            0% { transform: scale(0.3); opacity: 0; }
+            50% { transform: scale(1.3); opacity: 1; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+        .animate-check-pop { 
+            animation: check-pop 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; 
+        }
+        
+        /* 魔法星星特效 */
+        @keyframes particle-blast {
+            0% { transform: translate(0, 0) scale(1) rotate(0deg); opacity: 1; }
+            100% { transform: translate(var(--tx), var(--ty)) scale(0) rotate(180deg); opacity: 0; }
+        }
+        .animate-particle {
+            animation: particle-blast 0.6s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+        }
+        
+        /* 卡片開心搖擺舞 */
+        @keyframes happy-dance {
+            0%, 100% { transform: translateY(0) scale(1); }
+            20% { transform: translateY(-8px) scale(1.03) rotate(-2deg); }
+            40% { transform: translateY(0px) scale(1.03) rotate(2deg); }
+            60% { transform: translateY(-4px) scale(1.03) rotate(-1deg); }
+            80% { transform: translateY(0px) scale(1.03) rotate(1deg); }
+        }
+        .animate-happy-dance {
+            animation: happy-dance 0.7s ease-in-out forwards;
+            box-shadow: 0 0 30px rgba(52, 211, 153, 0.6) !important;
+            border-color: #34d399 !important;
+            z-index: 50;
         }
     </style>
 </head>
@@ -135,24 +174,73 @@
 
         const ICONS_DATA = {
             Calendar: <path d="M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z" />,
-            Trophy: <path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6M18 9h1.5a2.5 2.5 0 0 0 0-5H18M4 22h16M10 14.66V17c0 .55.47.98.97 1.21C12.23 18.8 13.77 18.8 15.03 18.21c.5-.23.97-.66.97-1.21v-2.34M12 6v8M12 6c-3.31 0-6 2.69-6 6s2.69 6 6 6 6-2.69 6-6-2.69-6-6-6z" />,
             Crown: <path d="m2 4 3 12h14l3-12-6 7-4-7-4 7-6-7z" />,
             CheckCircle2: <path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10zM9 12l2 2 4-4" />,
             Plus: <path d="M12 5v14M5 12h14" />,
             Trash2: <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M10 11v6M14 11v6" />,
             Settings2: <path d="M20 7h-9M14 17H5M17 12H7M7 2h0M7 22h0M17 2h0M17 22h0M7 7a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM17 12a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM7 17a3 3 0 1 0 0 6 3 3 0 0 0 0-6z" />,
-            User: <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2M12 3a4 4 0 1 0 0 8 4 4 0 0 0 0-8z" />,
-            ShieldCheck: <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10zM9 12l2 2 4-4" />,
-            X: <path d="M18 6 6 18M6 6l12 12" />,
-            Heart: <path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z" />,
-            Star: <path d="m12 2 3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />,
-            Sparkles: <path d="m12 3 1.91 5.82L20 10.73l-5.12 3.91L16.79 21 12 17.27 7.21 21l1.91-6.36L4 10.73l6.09-1.91L12 3z" />,
             GripVertical: <g><circle cx="9" cy="5" r="1.5"/><circle cx="9" cy="12" r="1.5"/><circle cx="9" cy="19" r="1.5"/><circle cx="15" cy="5" r="1.5"/><circle cx="15" cy="12" r="1.5"/><circle cx="15" cy="19" r="1.5"/></g>,
+            Heart: <path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z" />
         };
 
         const Icon = ({ name, className = "w-6 h-6", style = {}, strokeWidth = 2.5 }) => {
             return (
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" className={className} style={style}>{ICONS_DATA[name]}</svg>
+            );
+        };
+
+        const MagicSparkles = () => {
+            return (
+                <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-[100]">
+                    {[...Array(12)].map((_, i) => {
+                        const angle = (i * 30) * Math.PI / 180;
+                        const distance = 50 + Math.random() * 40;
+                        const tx = Math.cos(angle) * distance + 'px';
+                        const ty = Math.sin(angle) * distance + 'px';
+                        const colors = ['#ef4444', '#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899'];
+                        const color = colors[i % colors.length];
+                        const size = 6 + Math.random() * 8; 
+                        return (
+                            <div key={i} className="absolute rounded-full animate-particle"
+                                 style={{
+                                     width: `${size}px`, 
+                                     height: `${size}px`,
+                                     '--tx': tx, 
+                                     '--ty': ty,
+                                     backgroundColor: color,
+                                     boxShadow: `0 0 ${size/2}px ${color}`
+                                 }}
+                            />
+                        )
+                    })}
+                </div>
+            );
+        };
+
+        const CustomNewTrophy = ({ color }) => (
+            <svg viewBox="0 0 100 100" fill="none" stroke={color} xmlns="http://www.w3.org/2000/svg" className="w-16 h-16 sm:w-20 sm:h-20 md:w-24 md:h-24 trophy-glow animate-bounce-fast">
+                <path d="M20 30 H10 v10 a10 10 0 0 0 10 10 M80 30 H90 v10 a10 10 0 0 1 -10 10" strokeWidth="8" strokeLinecap="round" strokeLinejoin="round"/>
+                <path d="M20 20 H80 V40 A 30 30 0 0 1 20 40 Z" fill={color} fillOpacity="0.2" strokeWidth="8" strokeLinejoin="round"/>
+                <path d="M45 70 H55 V85 H45 Z" fill={color} fillOpacity="0.2" strokeWidth="8" strokeLinejoin="round"/>
+                <path d="M30 85 H70 V95 H30 Z" fill={color} fillOpacity="0.2" strokeWidth="8" strokeLinejoin="round"/>
+                <path d="M50 28 L52.5 36 H61 L54 41 L56.5 50 L50 44.5 L43.5 50 L46 41 L39 36 H47.5 Z" fill={color} stroke="none"/>
+            </svg>
+        );
+
+        const RoyalRays = () => {
+            const angles = [0, 36, 72, 108, 144, 180, 216, 252, 288, 324];
+            return (
+                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[200vmin] h-[200vmin] pointer-events-none z-[-1]"
+                     style={{ maskImage: 'radial-gradient(circle, transparent 3.5%, black 15%)', WebkitMaskImage: 'radial-gradient(circle, transparent 3.5%, black 15%)' }}>
+                    <div className="absolute inset-0 animate-[spin_15s_linear_infinite] flex items-center justify-center">
+                        {angles.map((a, index) => {
+                            const rayColor = index % 2 === 0 ? '#FFD700' : '#FFFFFF'; 
+                            return (
+                                <div key={`g1-${a}`} className="absolute h-full" style={{ transform: `rotate(${a}deg)`, width: '60px', background: `linear-gradient(to top, ${rayColor}, transparent 50%, ${rayColor})`, clipPath: 'polygon(49.5% 50%, 50.5% 50%, 100% 0, 0 0, 49.5% 50%, 50.5% 50%, 100% 100%, 0 100%)', opacity: 0.6 }} />
+                            );
+                        })}
+                    </div>
+                </div>
             );
         };
 
@@ -178,7 +266,6 @@
             { id: '19', cat: '週末', title: '喝小安素', rule: [6, 7] }
         ];
 
-        // --- 存儲邏輯 ---
         const DB_NAME = 'YangYangRoyal_V54_Full';
         const STORE_NAME = 'ChecklistData';
         const STORAGE_KEYS = {
@@ -251,6 +338,14 @@
             { id: 4, label: '四' }, { id: 5, label: '五' }, { id: 6, label: '六' }, { id: 7, label: '日' },
         ];
 
+        const triggerVibration = () => {
+            try {
+                if (window.navigator && window.navigator.vibrate) {
+                    window.navigator.vibrate([30, 50, 30]); 
+                }
+            } catch (e) {}
+        };
+
         const App = () => {
             const [mode, setMode] = useState('kid'); 
             const [realToday] = useState(new Date());
@@ -263,22 +358,89 @@
                 return baseDays.map((day, index) => {
                     const d = new Date(monday);
                     d.setDate(monday.getDate() + index);
-                    return { ...day, dateStr: `${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')}` };
+                    const fullDateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+                    return { ...day, dateStr: `${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')}`, fullDateStr };
                 });
             }, [realToday, realDayOfWeek]);
 
             const [selectedDay, setSelectedDay] = useState(realDayOfWeek); 
             const [checkedItems, setCheckedItems] = useState({});
+            const [sortingCheckedItems, setSortingCheckedItems] = useState({});
+            const [completedDates, setCompletedDates] = useState([]); 
+            
+            // 加入進度載入鎖定，防止切換天數時發生陣列洗牌誤刪達標紀錄
+            const [isLoadingProgress, setIsLoadingProgress] = useState(true);
+            
+            const [celebratingCards, setCelebratingCards] = useState({}); 
+            const [teleportingCards, setTeleportingCards] = useState({}); 
+            
             const [allTasks, setAllTasks] = useState(defaultTasks);
             const [isManageOpen, setIsManageOpen] = useState(false);
             const [deleteConfirmId, setDeleteConfirmId] = useState(null);
             const [showCelebration, setShowCelebration] = useState(false);
 
-            // Refs
             const manageListRef = useRef(null);
+            const kidListRef = useRef(null);
+            const completionTimeouts = useRef({});
+            const sortableInstanceRef = useRef(null);
 
             useEffect(() => {
-                const initTasks = async () => {
+                const interval = setInterval(() => {
+                    if (kidListRef.current && window.autoAnimate) {
+                        if (!kidListRef.current.hasAttribute('data-aa')) {
+                            window.autoAnimate(kidListRef.current, { duration: 400, easing: 'ease-in-out' });
+                            kidListRef.current.setAttribute('data-aa', 'true');
+                        }
+                    }
+                }, 150); 
+                return () => clearInterval(interval);
+            }); 
+
+            useEffect(() => {
+                if (isManageOpen && manageListRef.current && window.Sortable) {
+                    if (!sortableInstanceRef.current) {
+                        sortableInstanceRef.current = new window.Sortable(manageListRef.current, {
+                            animation: 350, 
+                            easing: "cubic-bezier(0.25, 1, 0.5, 1)", 
+                            handle: '.drag-handle',
+                            ghostClass: 'sortable-ghost',
+                            dragClass: 'sortable-drag',
+                            forceFallback: true, 
+                            fallbackTolerance: 3, 
+                            onStart: (evt) => {
+                                if (evt.dragged) {
+                                    evt.dragged.style.width = evt.item.offsetWidth + 'px';
+                                    evt.dragged.style.height = evt.item.offsetHeight + 'px';
+                                }
+                            },
+                            onEnd: (evt) => {
+                                const { oldIndex, newIndex, item } = evt;
+                                if (oldIndex !== newIndex && oldIndex !== undefined && newIndex !== undefined) {
+                                    const parent = evt.to;
+                                    const sibling = oldIndex < newIndex ? parent.children[oldIndex] : parent.children[oldIndex + 1];
+                                    parent.insertBefore(item, sibling);
+
+                                    setAllTasks(prev => {
+                                        const newTasks = [...prev];
+                                        const [moved] = newTasks.splice(oldIndex, 1);
+                                        newTasks.splice(newIndex, 0, moved);
+                                        robustSave(STORAGE_KEYS.TASKS, STORAGE_KEYS.TASKS_BAK, newTasks);
+                                        return newTasks;
+                                    });
+                                }
+                            }
+                        });
+                    }
+                } else {
+                    if (sortableInstanceRef.current) {
+                        sortableInstanceRef.current.destroy();
+                        sortableInstanceRef.current = null;
+                    }
+                }
+            });
+
+            useEffect(() => {
+                const initTasksAndDates = async () => {
                     const tasks = await robustLoad(STORAGE_KEYS.TASKS, STORAGE_KEYS.TASKS_BAK, defaultTasks);
                     if (Array.isArray(tasks) && tasks.length > 0) {
                         setAllTasks(tasks);
@@ -286,72 +448,127 @@
                         setAllTasks(defaultTasks);
                         robustSave(STORAGE_KEYS.TASKS, STORAGE_KEYS.TASKS_BAK, defaultTasks);
                     }
+                    
+                    const dates = await robustLoad('yang_v54_completed_dates', 'yang_v54_completed_dates_bak', []);
+                    setCompletedDates(dates);
                 };
-                initTasks();
+                initTasksAndDates();
             }, []);
 
+            // 修復1：利用 isLoadingProgress 鎖定載入期間，防止閃爍
             useEffect(() => {
+                let isMounted = true;
                 const initProgress = async () => {
+                    setIsLoadingProgress(true);
                     const checked = await robustLoad(STORAGE_KEYS.PROGRESS(selectedDay), STORAGE_KEYS.PROGRESS_BAK(selectedDay), {});
-                    setCheckedItems(checked);
+                    if (isMounted) {
+                        setCheckedItems(checked);
+                        setSortingCheckedItems(checked);
+                        setCelebratingCards({}); 
+                        setTeleportingCards({});
+                        setIsLoadingProgress(false);
+                    }
                 };
                 initProgress();
+                
+                return () => {
+                    isMounted = false;
+                    Object.values(completionTimeouts.current).forEach(clearTimeout);
+                    completionTimeouts.current = {};
+                };
             }, [selectedDay]);
 
-            // 初始化 SortableJS 以達成超流暢的拖曳與推擠動畫
-            useEffect(() => {
-                let sortableInstance;
-                if (isManageOpen && manageListRef.current && window.Sortable) {
-                    sortableInstance = new window.Sortable(manageListRef.current, {
-                        animation: 250, // 動畫過渡時間 (毫秒)，產生滑順推擠感
-                        easing: "cubic-bezier(0.25, 1, 0.5, 1)", 
-                        handle: '.drag-handle', // 限制只有點擊把手才能拖曳
-                        ghostClass: 'sortable-ghost',
-                        dragClass: 'sortable-drag',
-                        forceFallback: true, // 強制使用自定義樣式
-                        fallbackTolerance: 3, // 容錯機制：移動超過 3px 才算拖曳，避免點擊輸入框時誤判
-                        
-                        onStart: (evt) => {
-                            // 強制將拖曳中的分身鎖定為原來的實際寬度與高度
-                            if (evt.dragged) {
-                                evt.dragged.style.width = evt.item.offsetWidth + 'px';
-                                evt.dragged.style.height = evt.item.offsetHeight + 'px';
-                            }
-                        },
-                        onEnd: (evt) => {
-                            const { oldIndex, newIndex, item } = evt;
-                            if (oldIndex !== newIndex && oldIndex !== undefined && newIndex !== undefined) {
-                                // 為了不讓 React 與 Sortable 直接修改的 DOM 打架
-                                // 我們需要先把 DOM 節點塞回原本的位置，然後再透過改變 state 讓 React 來負責重新渲染畫面
-                                const parent = evt.to;
-                                const sibling = oldIndex < newIndex ? parent.children[oldIndex] : parent.children[oldIndex + 1];
-                                parent.insertBefore(item, sibling);
-
-                                // 同步更新 React State
-                                setAllTasks(prev => {
-                                    const newTasks = [...prev];
-                                    const [moved] = newTasks.splice(oldIndex, 1);
-                                    newTasks.splice(newIndex, 0, moved);
-                                    robustSave(STORAGE_KEYS.TASKS, STORAGE_KEYS.TASKS_BAK, newTasks);
-                                    return newTasks;
-                                });
-                            }
-                        }
-                    });
-                }
-                return () => {
-                    if (sortableInstance) sortableInstance.destroy();
-                };
-            }, [isManageOpen]);
-
-            const currentTasks = useMemo(() => allTasks.filter(t => t.rule.includes(selectedDay)), [selectedDay, allTasks]);
+            const currentTasks = useMemo(() => {
+                const filtered = allTasks.filter(t => t.rule.includes(selectedDay));
+                return filtered.sort((a, b) => {
+                    const aChecked = sortingCheckedItems[a.id] === true;
+                    const bChecked = sortingCheckedItems[b.id] === true;
+                    
+                    if (aChecked === bChecked) {
+                        return allTasks.findIndex(t => t.id === a.id) - allTasks.findIndex(t => t.id === b.id);
+                    }
+                    return aChecked ? 1 : -1;
+                });
+            }, [selectedDay, allTasks, sortingCheckedItems]);
+            
             const completedCount = currentTasks.filter(t => checkedItems[t.id]).length;
             const progress = currentTasks.length ? Math.round((completedCount / currentTasks.length) * 100) : 0;
+            
+            // 修復2：當該天完全沒有任務(放假)時，自動視為 100% 達標，不中斷天數！
+            const isDayCompleted = currentTasks.length === 0 ? true : progress === 100;
 
             useEffect(() => {
-                if (progress === 100 && currentTasks.length > 0 && mode === 'kid') setShowCelebration(true);
-                else setShowCelebration(false);
-            }, [progress, mode, currentTasks.length]);
+                if (isLoadingProgress) return;
+
+                if (progress === 100 && currentTasks.length > 0 && mode === 'kid') {
+                    setShowCelebration(true);
+                } else {
+                    setShowCelebration(false);
+                }
+
+                const selectedDayData = daysWithDates.find(d => d.id === selectedDay);
+                if (selectedDayData && selectedDayData.fullDateStr) {
+                    const fullDateStr = selectedDayData.fullDateStr;
+                    setCompletedDates(prev => {
+                        if (isDayCompleted) {
+                            if (!prev.includes(fullDateStr)) {
+                                const newDates = [...prev, fullDateStr];
+                                robustSave('yang_v54_completed_dates', 'yang_v54_completed_dates_bak', newDates);
+                                return newDates;
+                            }
+                        } else {
+                            if (prev.includes(fullDateStr)) {
+                                const newDates = prev.filter(d => d !== fullDateStr);
+                                robustSave('yang_v54_completed_dates', 'yang_v54_completed_dates_bak', newDates);
+                                return newDates;
+                            }
+                        }
+                        return prev;
+                    });
+                }
+            }, [isDayCompleted, progress, mode, currentTasks.length, selectedDay, daysWithDates, isLoadingProgress]);
+
+            // 修復3：即使當天沒有打開 App，放假日也會自動被承認計算在連續達標內
+            const currentStreak = useMemo(() => {
+                const getYYYYMMDD = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+                
+                const checkIsCompleted = (dateObj) => {
+                    const dateStr = getYYYYMMDD(dateObj);
+                    if (completedDates.includes(dateStr)) return true;
+                    
+                    const dayOfWeek = dateObj.getDay() || 7;
+                    const tasksForThatDay = allTasks.filter(t => t.rule.includes(dayOfWeek));
+                    if (tasksForThatDay.length === 0) return true; // 沒任務=放假=達標！
+                    
+                    return false;
+                };
+
+                let streak = 0;
+                let checkDate = new Date(realToday);
+                
+                if (checkIsCompleted(checkDate)) {
+                    streak++;
+                    checkDate.setDate(checkDate.getDate() - 1);
+                } else {
+                    checkDate.setDate(checkDate.getDate() - 1);
+                    if (checkIsCompleted(checkDate)) {
+                        streak++;
+                        checkDate.setDate(checkDate.getDate() - 1);
+                    } else {
+                        return 0; // 昨天今天都沒達標，斷更
+                    }
+                }
+
+                while (true) {
+                    if (checkIsCompleted(checkDate)) {
+                        streak++;
+                        checkDate.setDate(checkDate.getDate() - 1);
+                    } else {
+                        break;
+                    }
+                }
+                return streak;
+            }, [completedDates, realToday, allTasks]);
 
             const confettiParticles = useMemo(() => {
                 const colors = ['#ef4444', '#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#06b6d4'];
@@ -370,9 +587,39 @@
 
             const toggleItem = (id) => {
                 if (mode === 'kid' && selectedDay !== (realToday.getDay() || 7)) return;
-                const updatedChecked = { ...checkedItems, [id]: !checkedItems[id] };
+                
+                const isNowChecked = !checkedItems[id];
+                const updatedChecked = { ...checkedItems, [id]: isNowChecked };
                 setCheckedItems(updatedChecked);
                 robustSave(STORAGE_KEYS.PROGRESS(selectedDay), STORAGE_KEYS.PROGRESS_BAK(selectedDay), updatedChecked);
+                
+                if (completionTimeouts.current[`cel_${id}`]) clearTimeout(completionTimeouts.current[`cel_${id}`]);
+                if (completionTimeouts.current[`tel_${id}`]) clearTimeout(completionTimeouts.current[`tel_${id}`]);
+                if (completionTimeouts.current[`sort_${id}`]) clearTimeout(completionTimeouts.current[`sort_${id}`]);
+                if (completionTimeouts.current[`fin_${id}`]) clearTimeout(completionTimeouts.current[`fin_${id}`]);
+
+                if (isNowChecked) {
+                    triggerVibration(); 
+                    
+                    setCelebratingCards(prev => ({ ...prev, [id]: true }));
+
+                    completionTimeouts.current[`cel_${id}`] = setTimeout(() => {
+                        setTeleportingCards(prev => ({ ...prev, [id]: true }));
+
+                        completionTimeouts.current[`sort_${id}`] = setTimeout(() => {
+                            setSortingCheckedItems(prev => ({ ...prev, [id]: true }));
+
+                            completionTimeouts.current[`fin_${id}`] = setTimeout(() => {
+                                setCelebratingCards(prev => ({ ...prev, [id]: false }));
+                                setTeleportingCards(prev => ({ ...prev, [id]: false }));
+                            }, 50); 
+                        }, 300);
+                    }, 700); 
+                } else {
+                    setSortingCheckedItems(prev => ({ ...prev, [id]: false }));
+                    setCelebratingCards(prev => ({ ...prev, [id]: false }));
+                    setTeleportingCards(prev => ({ ...prev, [id]: false }));
+                }
             };
 
             const addTask = () => {
@@ -413,10 +660,18 @@
                 return `hsl(${Math.round(25 + (27 * ratio))}, ${Math.round(70 + (30 * ratio))}%, ${Math.round(45 + (12 * ratio))}%)`;
             }, [completedCount, currentTasks.length]);
 
+            const greetingText = useMemo(() => {
+                if (currentTasks.length === 0) return "今日放假！🏖️";
+                if (progress === 0) return "洋洋，加油！";
+                if (progress < 30) return "洋洋，好的開始！";
+                if (progress < 70) return "洋洋，繼續保持！";
+                if (progress < 100) return "洋洋，最後衝刺！";
+                return "洋洋，太棒了！";
+            }, [progress, currentTasks.length]);
+
             return (
                 <div className="app-container">
                     
-                    {/* 慶祝畫面 */}
                     {showCelebration && (
                         <div className="fixed inset-0 z-[250] flex flex-col items-center justify-center bg-black/80 backdrop-blur-md cursor-pointer animate-in fade-in duration-500 px-4 text-center"
                              onClick={() => setShowCelebration(false)}>
@@ -436,12 +691,16 @@
                                     />
                                 ))}
                             </div>
+                            
                             <div className="relative flex flex-col items-center justify-center w-full max-w-2xl transform scale-75 sm:scale-100">
                                 <div className="relative flex items-center justify-center w-56 h-56 md:w-72 md:h-72 mb-6">
-                                    <div className="absolute inset-[-50%] sunburst-rays animate-[spin_10s_linear_infinite]" />
-                                    <div className="absolute inset-0 bg-yellow-400 blur-[50px] opacity-40" />
-                                    <Icon name="Crown" className="relative z-[160] w-32 h-32 md:w-40 md:h-40 text-yellow-400 drop-shadow-[0_0_40px_rgba(250,204,21,1)] animate-bounce" strokeWidth={1.5} />
+                                    <RoyalRays />
+                                    <div className="absolute inset-0 bg-yellow-400 blur-[60px] opacity-50 animate-pulse" />
+                                    <div className="absolute inset-0 flex items-center justify-center z-[160]">
+                                        <Icon name="Crown" className="w-24 h-24 sm:w-32 sm:h-32 md:w-40 md:h-40 text-yellow-400 drop-shadow-[0_0_40px_rgba(250,204,21,1)] animate-bounce" strokeWidth={1.5} />
+                                    </div>
                                 </div>
+                                
                                 <div className="relative z-[160] bg-gradient-to-r from-yellow-300 via-orange-500 to-yellow-300 p-1 rounded-[3rem] shadow-2xl">
                                     <div className="bg-white px-10 py-12 rounded-[2.8rem] flex flex-col items-center overflow-hidden text-center">
                                         <h2 className="text-4xl sm:text-6xl font-black italic text-orange-600 mb-2 whitespace-nowrap">任務達成!!</h2>
@@ -454,7 +713,6 @@
 
                     <div className="main-card p-1.5 md:p-4 lg:p-6 relative overflow-hidden">
                         
-                        {/* 頂部切換 */}
                         <div className="flex justify-center mb-2 flex-shrink-0">
                             <div className="bg-white/80 backdrop-blur-sm p-1 rounded-xl shadow-sm border border-slate-200 flex gap-1 items-center">
                                 <button onClick={() => { setMode('kid'); setIsManageOpen(false); }}
@@ -470,7 +728,6 @@
 
                         <div className={`bg-white rounded-[2rem] md:rounded-[3.5rem] shadow-xl overflow-hidden border-b-[10px] main-card transition-all duration-500 flex flex-col ${mode === 'kid' ? 'border-orange-400' : 'border-indigo-600'}`}>
                             
-                            {/* Header */}
                             <div className={`px-6 py-4 md:px-10 md:py-8 text-white relative flex-shrink-0 transition-colors duration-1000 ${mode === 'kid' ? 'bg-gradient-to-br from-orange-400 via-rose-400 to-rose-500 shadow-inner' : 'bg-gradient-to-br from-indigo-600 to-blue-700'}`}>
                                 <div className="flex justify-between items-start mb-4">
                                    <div className="bg-white/20 backdrop-blur-md border border-white/30 px-5 py-2 rounded-2xl shadow-lg flex items-center gap-3">
@@ -481,16 +738,21 @@
                                 
                                 <div className="flex flex-row items-center justify-between gap-4">
                                     <div className="flex-1">
-                                        <h1 className="text-3xl sm:text-5xl md:text-7xl font-black drop-shadow-md tracking-tighter leading-tight mb-3">洋洋，加油！</h1>
-                                        <p className="text-sm sm:text-lg md:text-xl font-bold bg-black/10 px-6 py-2 rounded-2xl inline-flex items-center gap-2 backdrop-blur-sm shadow-inner">
-                                            {progress === 100 && currentTasks.length > 0 ? "🏆 完美的王者表現！" : `任務：${completedCount}/${currentTasks.length}`}
-                                        </p>
+                                        <h1 className="text-3xl sm:text-5xl md:text-7xl font-black drop-shadow-md tracking-tighter leading-tight mb-3">{greetingText}</h1>
+                                        <div className="flex flex-col items-start gap-2">
+                                            <p className="text-sm sm:text-lg md:text-xl font-bold bg-black/10 px-6 py-2 rounded-2xl inline-flex items-center gap-2 backdrop-blur-sm shadow-inner">
+                                                {progress === 100 && currentTasks.length > 0 ? "🏆 完美的王者表現！" : `任務：${completedCount}/${currentTasks.length}`}
+                                            </p>
+                                            <p className="text-xs sm:text-sm md:text-base font-bold bg-white/20 px-4 py-1.5 rounded-xl inline-flex items-center gap-1.5 backdrop-blur-sm shadow-inner text-white drop-shadow-sm border border-white/20">
+                                                🔥 連續達標：{currentStreak} 天
+                                            </p>
+                                        </div>
                                     </div>
                                     
                                     <div className="flex-shrink-0 w-28 h-28 sm:w-36 sm:h-36 md:w-48 md:h-48 aspect-square flex items-center justify-center bg-white/10 rounded-full border-[6px] border-white/20 shadow-xl backdrop-blur-md relative overflow-hidden group">
                                         {progress === 100 ? (
                                             <div className="absolute inset-0 flex items-center justify-center z-10 animate-in zoom-in duration-500">
-                                                <Icon name="Trophy" className="w-14 h-14 sm:w-16 sm:h-16 md:w-20 md:h-20 trophy-glow animate-bounce-fast" style={{ color: dynamicColor }} />
+                                                <CustomNewTrophy color={dynamicColor} />
                                             </div>
                                         ) : (
                                             <span className="absolute inset-0 flex items-center justify-center text-3xl sm:text-5xl md:text-7xl font-black z-10 text-white drop-shadow-md tracking-tighter">
@@ -505,7 +767,6 @@
                                 </div>
                             </div>
 
-                            {/* 星期導航 */}
                             <div className="flex justify-around px-4 py-3 md:px-10 md:py-6 bg-white border-b border-slate-50 no-scrollbar gap-1 flex-shrink-0">
                                 {daysWithDates.map((day) => (
                                     <button key={day.id} onClick={() => setSelectedDay(day.id)}
@@ -521,31 +782,43 @@
                                 ))}
                             </div>
 
-                            {/* 任務清單區 */}
                             <div className="scrollable-area no-scrollbar p-3 md:p-8 touch-pan-y bg-slate-50/50">
                                 {(mode === 'kid' || !isManageOpen) && (
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-6">
+                                    <div ref={kidListRef} className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-6 relative">
                                         {currentTasks.length > 0 ? (
                                             currentTasks.map((task) => (
                                                 <div key={task.id} onClick={() => toggleItem(task.id)}
-                                                    className={`group flex items-center gap-4 p-5 md:p-8 rounded-[2rem] md:rounded-[3rem] border-2 transition-all active:scale-[0.98] duration-300 ${
-                                                        checkedItems[task.id] ? 'bg-emerald-50 border-emerald-200' : (mode === 'kid' && selectedDay !== realDayOfWeek) ? 'bg-slate-50 border-transparent opacity-30 cursor-not-allowed' : 'bg-white border-slate-100 shadow-sm hover:border-orange-100 cursor-pointer'
+                                                    className={`h-full cursor-pointer transition-all duration-300 origin-center ${
+                                                        teleportingCards[task.id] ? 'scale-50 opacity-0' : 'scale-100 opacity-100'
                                                     }`}
                                                 >
-                                                    <div className="flex-shrink-0 relative">
-                                                        {checkedItems[task.id] ? (
-                                                            <div className="bg-emerald-500 rounded-2xl p-4 shadow-lg"><Icon name="CheckCircle2" className="w-8 h-8 text-white" /></div>
-                                                        ) : (
-                                                            <div className={`w-14 h-14 rounded-2xl border-[8px] transition-all duration-300 ${mode === 'kid' ? 'border-orange-50' : 'border-indigo-50'}`} />
-                                                        )}
-                                                    </div>
-                                                    <div className="flex-1 overflow-hidden text-left">
-                                                       <span className={`text-[10px] px-3 py-1 rounded-full font-black uppercase mb-1.5 inline-block ${
-                                                        task.cat === '每天' ? 'bg-orange-100 text-orange-600' : task.cat === '平日' ? 'bg-blue-100 text-blue-600' : task.cat === '葛洛莉' ? 'bg-emerald-100 text-emerald-600' : task.cat === '週末' || task.cat === '周六' ? 'bg-purple-100 text-purple-600' : 'bg-slate-100 text-slate-500'
-                                                      }`}>{task.cat}</span>
-                                                      <p className={`text-base sm:text-xl md:text-3xl font-black leading-snug tracking-tighter text-slate-800 break-words ${checkedItems[task.id] ? 'opacity-20 italic' : ''}`}>
-                                                        {task.title}
-                                                      </p>
+                                                    <div className={`h-full border-2 p-5 md:p-8 rounded-[2rem] md:rounded-[3rem] flex items-center gap-4 transition-all duration-300 ${
+                                                        celebratingCards[task.id] 
+                                                            ? 'bg-white animate-happy-dance' 
+                                                            : checkedItems[task.id] && !teleportingCards[task.id]
+                                                                ? 'bg-slate-100/60 border-slate-200/50 opacity-60 grayscale-[40%]' 
+                                                                : (mode === 'kid' && selectedDay !== realDayOfWeek) 
+                                                                    ? 'bg-slate-50 border-transparent opacity-30 cursor-not-allowed' 
+                                                                    : 'bg-white border-slate-100 shadow-sm hover:shadow-md hover:border-orange-100' 
+                                                    }`}>
+                                                        <div className="flex-shrink-0 relative">
+                                                            {celebratingCards[task.id] && <MagicSparkles />}
+                                                            
+                                                            {checkedItems[task.id] ? (
+                                                                <div className="bg-emerald-500 rounded-2xl p-4 shadow-lg animate-stamp relative z-10"><Icon name="CheckCircle2" className="w-8 h-8 text-white" /></div>
+                                                            ) : (
+                                                                <div className={`w-14 h-14 rounded-2xl border-[8px] transition-all duration-300 relative z-10 ${mode === 'kid' ? 'border-orange-50' : 'border-indigo-50'}`} />
+                                                            )}
+                                                        </div>
+                                                        <div className="flex-1 overflow-hidden text-left">
+                                                          <p className={`text-base sm:text-xl md:text-3xl font-black leading-snug tracking-tighter break-words transition-all duration-300 ${
+                                                              checkedItems[task.id] && !celebratingCards[task.id] && !teleportingCards[task.id]
+                                                                  ? 'text-slate-400 opacity-70' 
+                                                                  : 'text-slate-800'
+                                                          }`}>
+                                                            {task.title}
+                                                          </p>
+                                                        </div>
                                                     </div>
                                                 </div>
                                             ))
@@ -575,46 +848,45 @@
                                                     <Icon name="Plus" className="w-8 h-8" /> 新增一個王者作息
                                                 </button>
                                                 
-                                                {/* 加載 SortableJS 的拖曳區域 */}
                                                 <div ref={manageListRef} className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-6">
                                                     {allTasks.map((task) => (
                                                         <div 
                                                             key={task.id} 
                                                             data-id={task.id}
-                                                            /* 確保卡片本身沒有會干擾拖拉物理效果的 transform 漸變，讓 SortableJS 全權控制動畫 */
-                                                            className={`task-item bg-white border-2 border-slate-100 p-5 md:p-8 rounded-[2rem] md:rounded-[3rem] shadow-sm flex flex-col justify-center relative overflow-hidden`}
+                                                            className={`task-item h-full`}
                                                         >
-                                                            {deleteConfirmId === task.id && (
-                                                                <div className="absolute inset-0 bg-red-600/95 z-20 flex flex-col items-center justify-center p-4 text-white rounded-[2rem] md:rounded-[3rem]">
-                                                                    <p className="font-black text-lg mb-4">確定刪除？</p>
-                                                                    <div className="flex gap-4 w-full px-6 justify-center">
-                                                                        <button onClick={() => confirmRemoveTask(task.id)} className="flex-1 bg-white text-red-600 py-2 rounded-xl font-black shadow-xl">刪除</button>
-                                                                        <button onClick={() => setDeleteConfirmId(null)} className="flex-1 bg-red-800 text-white py-2 rounded-xl font-black border border-red-400">取消</button>
+                                                            <div className="task-inner h-full bg-white border-2 border-slate-100 p-5 md:p-8 rounded-[2rem] md:rounded-[3rem] shadow-sm flex flex-col justify-center relative overflow-hidden">
+                                                                {deleteConfirmId === task.id && (
+                                                                    <div className="absolute inset-0 bg-red-600/95 z-20 flex flex-col items-center justify-center p-4 text-white">
+                                                                        <p className="font-black text-lg mb-4">確定刪除？</p>
+                                                                        <div className="flex gap-4 w-full px-6 justify-center">
+                                                                            <button onClick={() => confirmRemoveTask(task.id)} className="flex-1 bg-white text-red-600 py-2 rounded-xl font-black shadow-xl">刪除</button>
+                                                                            <button onClick={() => setDeleteConfirmId(null)} className="flex-1 bg-red-800 text-white py-2 rounded-xl font-black border border-red-400">取消</button>
+                                                                        </div>
                                                                     </div>
-                                                                </div>
-                                                            )}
-                                                            
-                                                            <div className="flex items-center gap-4 mb-4">
-                                                                <div className="flex-shrink-0 relative">
-                                                                    {/* 拖曳把手 */}
-                                                                    <div className={`w-14 h-14 rounded-2xl border-[4px] border-indigo-50 bg-indigo-50/50 flex items-center justify-center drag-handle touch-none cursor-grab text-slate-400 hover:text-indigo-600 hover:bg-indigo-100 transition-colors`}>
-                                                                        <Icon name="GripVertical" className="w-8 h-8 pointer-events-none" />
+                                                                )}
+                                                                
+                                                                <div className="flex items-center gap-4 mb-4">
+                                                                    <div className="flex-shrink-0 relative">
+                                                                        <div className={`w-14 h-14 rounded-2xl border-[4px] border-indigo-50 bg-indigo-50/50 flex items-center justify-center drag-handle touch-none cursor-grab text-slate-400 hover:text-indigo-600 hover:bg-indigo-100 transition-colors`}>
+                                                                            <Icon name="GripVertical" className="w-8 h-8 pointer-events-none" />
+                                                                        </div>
                                                                     </div>
+                                                                    
+                                                                    <div className="flex-1 overflow-hidden">
+                                                                        <input value={task.title} onChange={(e) => updateTask(task.id, 'title', e.target.value)} className="w-full text-lg sm:text-xl md:text-2xl font-black bg-slate-50 border-none rounded-xl px-3 py-2 outline-none focus:ring-2 ring-indigo-200 text-left transition-shadow" placeholder="輸入作息..." />
+                                                                    </div>
+                                                                    
+                                                                    <button onClick={() => setDeleteConfirmId(task.id)} className="flex-shrink-0 p-3 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all">
+                                                                        <Icon name="Trash2" className="w-6 h-6" />
+                                                                    </button>
                                                                 </div>
                                                                 
-                                                                <div className="flex-1 overflow-hidden">
-                                                                    <input value={task.title} onChange={(e) => updateTask(task.id, 'title', e.target.value)} className="w-full text-lg sm:text-xl md:text-2xl font-black bg-slate-50 border-none rounded-xl px-3 py-2 outline-none focus:ring-2 ring-indigo-200 text-left transition-shadow" placeholder="輸入作息..." />
+                                                                <div className="flex flex-wrap gap-1.5 justify-start pl-[4.5rem]">
+                                                                    {baseDays.map(d => (
+                                                                        <button key={d.id} onClick={() => toggleTaskRule(task.id, d.id)} className={`w-8 h-8 md:w-9 md:h-9 rounded-xl text-xs font-black transition-all ${task.rule.includes(d.id) ? 'bg-indigo-600 text-white shadow-md' : 'bg-slate-50 text-slate-400 hover:bg-slate-100'}`}>{d.label}</button>
+                                                                    ))}
                                                                 </div>
-                                                                
-                                                                <button onClick={() => setDeleteConfirmId(task.id)} className="flex-shrink-0 p-3 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all">
-                                                                    <Icon name="Trash2" className="w-6 h-6" />
-                                                                </button>
-                                                            </div>
-                                                            
-                                                            <div className="flex flex-wrap gap-1.5 justify-start pl-[4.5rem]">
-                                                                {baseDays.map(d => (
-                                                                    <button key={d.id} onClick={() => toggleTaskRule(task.id, d.id)} className={`w-8 h-8 md:w-9 md:h-9 rounded-xl text-xs font-black transition-all ${task.rule.includes(d.id) ? 'bg-indigo-600 text-white shadow-md' : 'bg-slate-50 text-slate-400 hover:bg-slate-100'}`}>{d.label}</button>
-                                                                ))}
                                                             </div>
                                                         </div>
                                                     ))}
@@ -625,7 +897,6 @@
                                 )}
                             </div>
 
-                            {/* Footer */}
                             <div className="py-4 bg-slate-50 border-t border-slate-100 flex justify-center items-center flex-shrink-0">
                                 <div className="flex items-center gap-6 text-[10px] font-black text-slate-300 tracking-[0.6em] uppercase opacity-60 text-center">
                                    YANG YANG ROYAL v54.0
