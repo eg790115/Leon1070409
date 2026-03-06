@@ -39,9 +39,11 @@
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- 動畫引擎 -->
+    <!-- 圖表與動畫引擎 -->
     <script src="https://cdn.jsdelivr.net/npm/@formkit/auto-animate@0.8.2/index.global.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
+    <script src="https://unpkg.com/prop-types@15.8.1/prop-types.min.js"></script>
+    <script src="https://unpkg.com/recharts@2.1.12/umd/Recharts.js"></script>
 
     <style>
         /* 鎖定螢幕與防呆 */
@@ -63,11 +65,19 @@
         .animate-confetti-fall { animation: confetti-fall linear infinite; will-change: transform, opacity; }
 
         /* 全螢幕雙層光芒特效 */
-        .sunburst-layer-1 { background: repeating-conic-gradient(from 0deg, #FDE047 0deg 4deg, transparent 4deg 40deg); border-radius: 50%; animation: spin-rays 35s linear infinite; }
-        .sunburst-layer-2 { background: repeating-conic-gradient(from 10deg, rgba(255,255,255,0.7) 0deg 3deg, transparent 3deg 45deg); border-radius: 50%; animation: spin-rays 20s linear infinite; }
+        .sunburst-layer-1 {
+            background: repeating-conic-gradient(from 0deg, #FDE047 0deg 4deg, transparent 4deg 40deg);
+            border-radius: 50%;
+            animation: spin-rays 35s linear infinite;
+        }
+        .sunburst-layer-2 {
+            background: repeating-conic-gradient(from 10deg, rgba(255,255,255,0.7) 0deg 3deg, transparent 3deg 45deg);
+            border-radius: 50%;
+            animation: spin-rays 20s linear infinite;
+        }
         @keyframes spin-rays { 100% { transform: rotate(360deg); } }
         
-        /* 完美的彈性置中框架 */
+        /* 修復版面：使用標準 Flex 佈局防止破圖 */
         .app-container { height: 100vh; display: flex; flex-direction: column; overflow: hidden; width: 100%; align-items: center; }
         
         .touch-none { touch-action: none; }
@@ -104,6 +114,8 @@
 
     <script type="text/babel">
         const { useState, useEffect, useMemo, useRef, useCallback, Fragment } = React; 
+        // 載入 Recharts 圖表模組
+        const { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip: RechartsTooltip, ResponsiveContainer, ReferenceLine, Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis } = window.Recharts || {};
 
         const ICONS_DATA = {
             Calendar: <path d="M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z" />,
@@ -127,7 +139,8 @@
             Lock: <Fragment><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></Fragment>,
             Fingerprint: <Fragment><path d="M2 12C2 6.48 6.48 2 12 2s10 4.48 10 10"/><path d="M5 15.5C3.12 13.9 2 11.58 2 9c0-5.52 4.48-10 10-10s10 4.48 10 10c0 2.58-1.12 4.9-2.99 6.5"/><path d="M8.5 19C6.38 17.5 5 15.14 5 12.5c0-3.87 3.13-7 7-7s7 3.13 7 7c0 2.64-1.38 5-3.5 6.5"/><path d="M12 22v-4"/><path d="M12 14v-2"/><path d="M15.5 19c1.62-1.5 2.5-3.64 2.5-6 0-2.21-1.79-4-4-4s-4 1.79-4 4c0 2.36.88 4.5 2.5 6"/></Fragment>,
             Download: <Fragment><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></Fragment>,
-            Upload: <Fragment><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></Fragment>
+            Upload: <Fragment><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></Fragment>,
+            ChartLine: <Fragment><polyline points="3 3 3 21 21 21"/><polyline points="3 14 8 9 13 14 21 5"/></Fragment>
         };
 
         function Icon({ name, className = "w-6 h-6", style = {}, strokeWidth = 2.5 }) {
@@ -258,11 +271,9 @@
         };
 
         const robustLoad = async (key, backupKey, defaultValue) => {
-            // 自動向下相容 V92 的資料 (無縫轉移)
-            const legacyKey = key.replace('yang_data_', 'yang_v92_');
             try {
                 let primary = localStorage.getItem(key);
-                if (!primary) primary = localStorage.getItem(legacyKey);
+                if (!primary) primary = localStorage.getItem(key.replace('yang_data_', 'yang_v92_')); // 向下相容
                 if (primary) return JSON.parse(primary);
                 
                 let backup = localStorage.getItem(backupKey);
@@ -272,8 +283,6 @@
             
             const idbData = await idbLoad(key);
             if (idbData) return idbData;
-            const legacyIdbData = await idbLoad(legacyKey);
-            if (legacyIdbData) return legacyIdbData;
             
             return defaultValue;
         };
@@ -282,6 +291,15 @@
             { id: 1, label: '一' }, { id: 2, label: '二' }, { id: 3, label: '三' },
             { id: 4, label: '四' }, { id: 5, label: '五' }, { id: 6, label: '六' }, { id: 7, label: '日' },
         ];
+
+        // 獨立於組件外的全域輔助函式
+        const isDayActuallyCompleted = (dateStr, completedSet, allTasks) => {
+            if (completedSet.has(dateStr)) return true;
+            const dObj = new Date(dateStr);
+            const dow = dObj.getDay() || 7;
+            const tasksForDay = allTasks.filter(t => t.rule.includes(dow));
+            return tasksForDay.length === 0;
+        };
 
         const triggerVibration = () => { try { if (window.navigator && window.navigator.vibrate) window.navigator.vibrate([30, 50, 30]); } catch (e) {} };
 
@@ -341,14 +359,6 @@
             return `${m}月第${weekNames[weekNum - 1] || weekNum}週`;
         };
 
-        const isDayActuallyCompleted = (dateStr, completedSet, allTasks) => {
-            if (completedSet.has(dateStr)) return true;
-            const dObj = new Date(dateStr);
-            const dow = dObj.getDay() || 7;
-            const tasksForDay = allTasks.filter(t => t.rule.includes(dow));
-            return tasksForDay.length === 0;
-        };
-
         const delay = (ms) => new Promise(res => setTimeout(res, ms));
 
         const App = () => {
@@ -362,9 +372,12 @@
             const [loginError, setLoginError] = useState('');
             
             // 安全設定狀態
-            const [showSecurityModal, setShowSecurityModal] = useState(false);
-            const [newPin, setNewPin] = useState('');
+            const [settingOldPin, setSettingOldPin] = useState('');
+            const [settingNewPin, setSettingNewPin] = useState('');
             const [hasBioBound, setHasBioBound] = useState(false);
+
+            // 分析狀態
+            const [analysisSubject, setAnalysisSubject] = useState('');
 
             const [realToday] = useState(new Date());
             const realDayOfWeek = useMemo(() => realToday.getDay() || 7, [realToday]);
@@ -414,7 +427,7 @@
             const [editExamDate, setEditExamDate] = useState('');
             const [editExamSubject, setEditExamSubject] = useState('');
             const [editExamType, setEditExamType] = useState('');
-            const [editExamUnit, setEditExamUnit] = useState(''); // Parent uses simple text input
+            const [editExamUnit, setEditExamUnit] = useState(''); 
             const [editExamScore, setEditExamScore] = useState('');
             
             const [examRules, setExamRules] = useState([]);
@@ -475,6 +488,7 @@
                 touchEndX.current = null;
             };
 
+            // 【性能優化】：移除定時器的 autoAnimate，改在列表變動時直接綁定
             useEffect(() => {
                 if (kidListRef.current && window.autoAnimate) {
                     if (!kidListRef.current.hasAttribute('data-aa')) {
@@ -547,6 +561,14 @@
                 initData();
             }, []);
 
+            // 初始化分析的預設科目
+            useEffect(() => {
+                if (exams.length > 0 && !analysisSubject) {
+                    const availableSubjects = Array.from(new Set(exams.map(e => e.subject)));
+                    if (availableSubjects.length > 0) setAnalysisSubject(availableSubjects[0]);
+                }
+            }, [exams, analysisSubject]);
+
             // 日期切換時載入資料
             useEffect(() => {
                 if (!activeDateStr) return;
@@ -601,10 +623,7 @@
             const currentStreak = useMemo(() => {
                 const checkIsCompleted = (dateObj) => {
                     const dateStr = getYYYYMMDD(dateObj);
-                    if (completedDates.includes(dateStr)) return true;
-                    const dow = dateObj.getDay() || 7;
-                    if (allTasks.filter(t => t.rule.includes(dow)).length === 0) return true; 
-                    return false;
+                    return isDayActuallyCompleted(dateStr, new Set(completedDates), allTasks);
                 };
 
                 let streak = 0; let checkDate = new Date(realToday);
@@ -630,108 +649,14 @@
             const currentMonthProgress = useMemo(() => {
                 const y = realToday.getFullYear(); const m = realToday.getMonth() + 1;
                 const daysInMonth = new Date(y, m, 0).getDate();
-                let count = 0; const completedSet = new Set(completedDates);
+                let count = 0;
+                const completedSet = new Set(completedDates);
                 for(let i=1; i<=daysInMonth; i++) {
                     const cur = `${y}-${String(m).padStart(2,'0')}-${String(i).padStart(2,'0')}`;
                     if (isDayActuallyCompleted(cur, completedSet, allTasks)) count++;
                 }
                 return { count, total: daysInMonth };
             }, [realToday, completedDates, allTasks]);
-
-            // 家長安全登入邏輯
-            const handlePinLogin = (pin) => {
-                if (pin === '9999') {
-                    localStorage.setItem(STORAGE_KEYS.PARENT_PIN, '0000');
-                    setIsParentAuth(true);
-                    setLoginPin('');
-                    setLoginError('');
-                    alert("✅ 已使用緊急萬用碼登入！\n您的管理密碼已被重置為預設的「0000」。\n請至「系統安全設定」重新修改密碼。");
-                    return;
-                }
-                const correctPin = localStorage.getItem(STORAGE_KEYS.PARENT_PIN) || '0000';
-                if (pin === correctPin) {
-                    setIsParentAuth(true);
-                    setLoginPin('');
-                    setLoginError('');
-                } else {
-                    setLoginError('密碼錯誤！');
-                    setLoginPin('');
-                    setTimeout(() => setLoginError(''), 1000);
-                }
-            };
-
-            const bindBiometrics = async () => {
-                if (!window.PublicKeyCredential) { alert("此裝置不支援生物辨識"); return; }
-                try {
-                    const challenge = new Uint8Array(32); window.crypto.getRandomValues(challenge);
-                    const userID = new Uint8Array(16); window.crypto.getRandomValues(userID);
-                    const cred = await navigator.credentials.create({
-                        publicKey: {
-                            challenge, rp: { name: "洋洋作息表" }, user: { id: userID, name: "Parent", displayName: "家長" },
-                            pubKeyCredParams: [{ type: "public-key", alg: -7 }, { type: "public-key", alg: -257 }],
-                            authenticatorSelection: { authenticatorAttachment: "platform", userVerification: "required" },
-                            timeout: 60000
-                        }
-                    });
-                    localStorage.setItem(STORAGE_KEYS.PARENT_BIO, btoa(String.fromCharCode.apply(null, new Uint8Array(cred.rawId))));
-                    setHasBioBound(true);
-                    alert("✅ 生物辨識綁定成功！");
-                } catch (e) { alert("綁定失敗或被取消"); }
-            };
-
-            const loginWithBiometrics = async () => {
-                const base64Id = localStorage.getItem(STORAGE_KEYS.PARENT_BIO);
-                if (!base64Id) return;
-                try {
-                    const idStr = atob(base64Id);
-                    const idArray = new Uint8Array(idStr.length);
-                    for (let i=0; i<idStr.length; i++) idArray[i] = idStr.charCodeAt(i);
-                    const challenge = new Uint8Array(32); window.crypto.getRandomValues(challenge);
-                    
-                    await navigator.credentials.get({
-                        publicKey: { challenge, allowCredentials: [{ type: "public-key", id: idArray }], userVerification: "required" }
-                    });
-                    setIsParentAuth(true);
-                    setLoginError('');
-                } catch (e) { setLoginError('辨識失敗'); setTimeout(() => setLoginError(''), 1000); }
-            };
-
-            // 資料匯出與匯入
-            const handleExportData = () => {
-                const exportObj = {};
-                for (let i = 0; i < localStorage.length; i++) {
-                    const key = localStorage.key(i);
-                    if (key.startsWith('yang_data_')) {
-                        exportObj[key] = localStorage.getItem(key);
-                    }
-                }
-                const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(exportObj));
-                const dlAnchorElem = document.createElement('a');
-                dlAnchorElem.setAttribute("href", dataStr);
-                dlAnchorElem.setAttribute("download", `洋洋作息表備份_${getYYYYMMDD(realToday)}.json`);
-                dlAnchorElem.click();
-            };
-
-            const handleImportData = (e) => {
-                const file = e.target.files[0];
-                if (!file) return;
-                const reader = new FileReader();
-                reader.onload = (event) => {
-                    try {
-                        const importedData = JSON.parse(event.target.result);
-                        Object.keys(importedData).forEach(key => {
-                            if (key.startsWith('yang_data_')) {
-                                localStorage.setItem(key, importedData[key]);
-                            }
-                        });
-                        alert('✅ 資料還原成功！系統將重新載入。');
-                        window.location.reload();
-                    } catch (err) {
-                        alert('❌ 備份檔解析失敗，請確認檔案正確。');
-                    }
-                };
-                reader.readAsText(file);
-            };
 
             const isPeriodFullyCompleted = useCallback((periodId) => {
                 const completedSet = new Set(completedDates);
@@ -829,7 +754,6 @@
                 return available.sort((a,b) => b.periodId.localeCompare(a.periodId)); 
             }, [completedDates, allTasks, rewards, realToday, examRules, exams]);
 
-            // 【關鍵修復】：加入了 syncTrigger 依賴，確保補登後月曆100%瞬間更新
             const parentCalendarData = useMemo(() => {
                 const base = new Date(realToday);
                 base.setMonth(base.getMonth() + parentMonthOffset);
@@ -889,92 +813,89 @@
             }, [parentCalendarData, selectedLogDateStr]);
 
             const logDayTasks = useMemo(() => {
-            if (!selectedLogDayObj) return [];
-            return allTasks.filter(t => t.rule.includes(selectedLogDayObj.dow)).sort((a, b) => {
-                const aC = selectedLogDayObj.checkedData[a.id];
-                const bC = selectedLogDayObj.checkedData[b.id];
-                if (aC === bC) return allTasks.findIndex(t=>t.id===a.id) - allTasks.findIndex(t=>t.id===b.id);
-                return aC ? 1 : -1; 
-            });
-        }, [selectedLogDayObj, allTasks]);
+                if (!selectedLogDayObj) return [];
+                return allTasks.filter(t => t.rule.includes(selectedLogDayObj.dow)).sort((a, b) => {
+                    const aC = selectedLogDayObj.checkedData[a.id];
+                    const bC = selectedLogDayObj.checkedData[b.id];
+                    if (aC === bC) return allTasks.findIndex(t=>t.id===a.id) - allTasks.findIndex(t=>t.id===b.id);
+                    return aC ? 1 : -1; 
+                });
+            }, [selectedLogDayObj, allTasks]);
 
-        // ================= 核心動作處理區 ================= //
+            // ================= 核心動作處理區 ================= //
 
-        const handleLogTask = (taskId, dayObj) => {
-            // 從 localStorage 直取最新狀態，防連點覆蓋 Bug
-            const raw = localStorage.getItem(STORAGE_KEYS.PROGRESS(dayObj.dateStr));
-            const freshChecked = raw ? JSON.parse(raw) : { ...dayObj.checkedData };
-            const isCurrentlyChecked = !!freshChecked[taskId];
-            
-            if (isCurrentlyChecked) playSound('uncheck');
-            else playSound('check');
-
-            setAnimatingLogTasks(prev => ({ ...prev, [taskId]: !isCurrentlyChecked ? 'checking' : 'unchecking' }));
-            
-            setTimeout(() => {
-                const updatedChecked = { ...freshChecked, [taskId]: !isCurrentlyChecked };
-                robustSave(STORAGE_KEYS.PROGRESS(dayObj.dateStr), STORAGE_KEYS.PROGRESS_BAK(dayObj.dateStr), updatedChecked);
-                checkAndUpdateCompletion(dayObj.dateStr, dayObj.dow, updatedChecked);
+            const handleLogTask = (taskId, dayObj) => {
+                const raw = localStorage.getItem(STORAGE_KEYS.PROGRESS(dayObj.dateStr));
+                const freshChecked = raw ? JSON.parse(raw) : { ...dayObj.checkedData };
+                const isCurrentlyChecked = !!freshChecked[taskId];
                 
-                if (dayObj.dateStr === activeDateStr) {
-                    setCheckedItems(updatedChecked);
-                    setSortingCheckedItems(updatedChecked);
+                if (isCurrentlyChecked) playSound('uncheck');
+                else playSound('check');
+
+                setAnimatingLogTasks(prev => ({ ...prev, [taskId]: !isCurrentlyChecked ? 'checking' : 'unchecking' }));
+                
+                setTimeout(() => {
+                    const updatedChecked = { ...freshChecked, [taskId]: !isCurrentlyChecked };
+                    robustSave(STORAGE_KEYS.PROGRESS(dayObj.dateStr), STORAGE_KEYS.PROGRESS_BAK(dayObj.dateStr), updatedChecked);
+                    checkAndUpdateCompletion(dayObj.dateStr, dayObj.dow, updatedChecked);
+                    
+                    if (dayObj.dateStr === activeDateStr) {
+                        setCheckedItems(updatedChecked);
+                        setSortingCheckedItems(updatedChecked);
+                    }
+
+                    setSyncTrigger(prev => prev + 1); 
+                    
+                    setAnimatingLogTasks(prev => { const next = {...prev}; delete next[taskId]; return next; });
+                }, 250); 
+            };
+
+            const toggleItem = async (id) => {
+                if (mode === 'kid' && isFutureDate) return; 
+                if (mode === 'kid' && selectedDay !== (realToday.getDay() || 7)) return; 
+                if (isAnimatingRef.current) return; 
+                
+                const isNowChecked = !checkedItems[id];
+                const updatedChecked = { ...checkedItems, [id]: isNowChecked };
+                
+                setCheckedItems(updatedChecked);
+                robustSave(STORAGE_KEYS.PROGRESS(activeDateStr), STORAGE_KEYS.PROGRESS_BAK(activeDateStr), updatedChecked);
+                checkAndUpdateCompletion(activeDateStr, selectedDay, updatedChecked);
+                
+                const nextCompletedCount = currentTasks.filter(t => updatedChecked[t.id]).length;
+                const isFullComplete = isNowChecked && nextCompletedCount === currentTasks.length && currentTasks.length > 0;
+
+                if (isNowChecked) {
+                    isAnimatingRef.current = true;
+                    playSound('check');
+                    triggerVibration(); 
+                    
+                    setCelebratingCards(prev => ({ ...prev, [id]: true }));
+                    await delay(600); 
+
+                    setTeleportingCards(prev => ({ ...prev, [id]: true }));
+                    await delay(300); 
+
+                    setSortingCheckedItems(prev => ({ ...prev, [id]: true }));
+                    await delay(50); 
+
+                    setCelebratingCards(prev => ({ ...prev, [id]: false }));
+                    setTeleportingCards(prev => ({ ...prev, [id]: false })); 
+                    
+                    if (isFullComplete) {
+                        setShowCelebration(true);
+                        playSound('tada'); 
+                    }
+                    isAnimatingRef.current = false;
+                } else {
+                    playSound('uncheck');
+                    setSortingCheckedItems(updatedChecked); 
+                    setCelebratingCards(prev => ({ ...prev, [id]: false }));
+                    setTeleportingCards(prev => ({ ...prev, [id]: false }));
                 }
+            };
 
-                // 強制月曆重繪
-                setSyncTrigger(prev => prev + 1); 
-                
-                setAnimatingLogTasks(prev => { const next = {...prev}; delete next[taskId]; return next; });
-            }, 250); 
-        };
-
-        const toggleItem = async (id) => {
-            if (mode === 'kid' && isFutureDate) return; 
-            if (mode === 'kid' && selectedDay !== (realToday.getDay() || 7)) return; 
-            if (isAnimatingRef.current) return; 
-            
-            const isNowChecked = !checkedItems[id];
-            const updatedChecked = { ...checkedItems, [id]: isNowChecked };
-            
-            setCheckedItems(updatedChecked);
-            robustSave(STORAGE_KEYS.PROGRESS(activeDateStr), STORAGE_KEYS.PROGRESS_BAK(activeDateStr), updatedChecked);
-            checkAndUpdateCompletion(activeDateStr, selectedDay, updatedChecked);
-            
-            const nextCompletedCount = currentTasks.filter(t => updatedChecked[t.id]).length;
-            const isFullComplete = isNowChecked && nextCompletedCount === currentTasks.length && currentTasks.length > 0;
-
-            if (isNowChecked) {
-                isAnimatingRef.current = true;
-                playSound('check');
-                triggerVibration(); 
-                
-                setCelebratingCards(prev => ({ ...prev, [id]: true }));
-                await delay(600); // 等待跳舞動畫結束
-
-                setTeleportingCards(prev => ({ ...prev, [id]: true }));
-                await delay(300); // 等待縮小動畫結束
-
-                setSortingCheckedItems(prev => ({ ...prev, [id]: true }));
-                await delay(50); 
-
-                setCelebratingCards(prev => ({ ...prev, [id]: false }));
-                setTeleportingCards(prev => ({ ...prev, [id]: false })); 
-                
-                // 動畫全部結束後，再判斷是否滿分並顯示慶祝畫面
-                if (isFullComplete) {
-                    setShowCelebration(true);
-                    playSound('tada'); 
-                }
-                isAnimatingRef.current = false;
-            } else {
-                playSound('uncheck');
-                setSortingCheckedItems(updatedChecked); 
-                setCelebratingCards(prev => ({ ...prev, [id]: false }));
-                setTeleportingCards(prev => ({ ...prev, [id]: false }));
-            }
-        };
-
-        const handleAddExam = () => {
+            const handleAddExam = () => {
                 if (!examSubject || !examScore) return;
                 let scoreNum = parseInt(examScore, 10);
                 if (isNaN(scoreNum)) scoreNum = 0; if (scoreNum < 0) scoreNum = 0; if (scoreNum > 100) scoreNum = 100;
@@ -1100,6 +1021,101 @@
                 // Mock behavior for testing AI logic
             };
 
+            // 家長安全登入邏輯
+            const handlePinLogin = (pin) => {
+                if (pin === '9999') {
+                    localStorage.setItem(STORAGE_KEYS.PARENT_PIN, '0000');
+                    setIsParentAuth(true);
+                    setLoginPin('');
+                    setLoginError('');
+                    alert("✅ 已使用緊急萬用碼登入！\n您的管理密碼已被重置為預設的「0000」。\n請至「系統安全設定」重新修改密碼。");
+                    return;
+                }
+                const correctPin = localStorage.getItem(STORAGE_KEYS.PARENT_PIN) || '0000';
+                if (pin === correctPin) {
+                    setIsParentAuth(true);
+                    setLoginPin('');
+                    setLoginError('');
+                } else {
+                    setLoginError('密碼錯誤！');
+                    setLoginPin('');
+                    setTimeout(() => setLoginError(''), 1000);
+                }
+            };
+
+            const bindBiometrics = async () => {
+                if (!window.PublicKeyCredential) { alert("此裝置不支援生物辨識"); return; }
+                try {
+                    const challenge = new Uint8Array(32); window.crypto.getRandomValues(challenge);
+                    const userID = new Uint8Array(16); window.crypto.getRandomValues(userID);
+                    const cred = await navigator.credentials.create({
+                        publicKey: {
+                            challenge, rp: { name: "洋洋作息表" }, user: { id: userID, name: "Parent", displayName: "家長" },
+                            pubKeyCredParams: [{ type: "public-key", alg: -7 }, { type: "public-key", alg: -257 }],
+                            authenticatorSelection: { authenticatorAttachment: "platform", userVerification: "required" },
+                            timeout: 60000
+                        }
+                    });
+                    localStorage.setItem(STORAGE_KEYS.PARENT_BIO, btoa(String.fromCharCode.apply(null, new Uint8Array(cred.rawId))));
+                    setHasBioBound(true);
+                    alert("✅ 生物辨識綁定成功！");
+                } catch (e) { alert("綁定失敗或被取消"); }
+            };
+
+            const loginWithBiometrics = async () => {
+                const base64Id = localStorage.getItem(STORAGE_KEYS.PARENT_BIO);
+                if (!base64Id) return;
+                try {
+                    const idStr = atob(base64Id);
+                    const idArray = new Uint8Array(idStr.length);
+                    for (let i=0; i<idStr.length; i++) idArray[i] = idStr.charCodeAt(i);
+                    const challenge = new Uint8Array(32); window.crypto.getRandomValues(challenge);
+                    
+                    await navigator.credentials.get({
+                        publicKey: { challenge, allowCredentials: [{ type: "public-key", id: idArray }], userVerification: "required" }
+                    });
+                    setIsParentAuth(true);
+                    setLoginError('');
+                } catch (e) { setLoginError('辨識失敗'); setTimeout(() => setLoginError(''), 1000); }
+            };
+
+            // 資料匯出與匯入
+            const handleExportData = () => {
+                const exportObj = {};
+                for (let i = 0; i < localStorage.length; i++) {
+                    const key = localStorage.key(i);
+                    if (key.startsWith('yang_data_')) {
+                        exportObj[key] = localStorage.getItem(key);
+                    }
+                }
+                const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(exportObj));
+                const dlAnchorElem = document.createElement('a');
+                dlAnchorElem.setAttribute("href", dataStr);
+                dlAnchorElem.setAttribute("download", `洋洋作息表備份_${getYYYYMMDD(realToday)}.json`);
+                dlAnchorElem.click();
+            };
+
+            const handleImportData = (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    try {
+                        const importedData = JSON.parse(event.target.result);
+                        Object.keys(importedData).forEach(key => {
+                            if (key.startsWith('yang_data_')) {
+                                localStorage.setItem(key, importedData[key]);
+                            }
+                        });
+                        alert('✅ 資料還原成功！系統將重新載入。');
+                        window.location.reload();
+                    } catch (err) {
+                        alert('❌ 備份檔解析失敗，請確認檔案為正確的 JSON 格式。');
+                    }
+                };
+                reader.readAsText(file);
+            };
+
             const sortedRewardsHistory = useMemo(() => { return [...rewards].sort((a, b) => (b.sortKey || b.id).localeCompare(a.sortKey || a.id)); }, [rewards]);
             
             const activeExams = useMemo(() => { return exams.filter(e => e.dateStr === selectedExamDateStr); }, [exams, selectedExamDateStr]);
@@ -1127,6 +1143,111 @@
                     return <div key={i} className="absolute rounded-sm animate-confetti-fall" style={{ backgroundColor: colors[i % colors.length], left: `${Math.random() * 100}%`, width: `10px`, height: `8px`, animationDuration: `${Math.random() * 2 + 2}s`, animationDelay: `${Math.random() * 3}s`, opacity: Math.random() + 0.5 }} />;
                 });
             }, []);
+
+            // 繪製「成績圖表分析」
+            const renderParentAnalysis = () => {
+                const availableSubjects = Array.from(new Set(exams.map(e => e.subject)));
+                const currentSubj = availableSubjects.includes(analysisSubject) ? analysisSubject : (availableSubjects[0] || '');
+
+                const chartData = exams
+                    .filter(e => e.subject === currentSubj)
+                    .sort((a,b) => a.dateStr.localeCompare(b.dateStr) || a.id.localeCompare(b.id))
+                    .map(e => ({
+                        name: `${e.dateStr.substring(5)} ${e.unit || ''}`,
+                        score: e.score,
+                        unit: e.unit,
+                        type: e.type,
+                        fullDate: e.dateStr
+                    }));
+
+                const avgScore = chartData.length ? Math.round(chartData.reduce((acc, curr) => acc + curr.score, 0) / chartData.length) : 0;
+                const maxScore = chartData.length ? Math.max(...chartData.map(d => d.score)) : 0;
+
+                // 準備雷達圖資料 (各科平均)
+                const radarData = examSubjects.map(subj => {
+                    const subjExams = exams.filter(e => e.subject === subj);
+                    const avg = subjExams.length ? Math.round(subjExams.reduce((a, c) => a + c.score, 0) / subjExams.length) : 0;
+                    return { subject: subj, score: avg, fullMark: 100 };
+                }).filter(d => d.score > 0);
+
+                return (
+                    <div className="max-w-4xl mx-auto space-y-6 animate-slide-down">
+                        {radarData.length > 0 && window.Recharts && (
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                                <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col items-center">
+                                     <h4 className="text-sm font-black text-slate-600 mb-2">各科平均雷達圖</h4>
+                                     <div className="w-full h-[200px]">
+                                         <ResponsiveContainer width="100%" height="100%">
+                                             <RadarChart cx="50%" cy="50%" outerRadius="70%" data={radarData}>
+                                                 <PolarGrid stroke="#e2e8f0" />
+                                                 <PolarAngleAxis dataKey="subject" tick={{ fill: '#64748b', fontSize: 12, fontWeight: 'bold' }} />
+                                                 <PolarRadiusAxis angle={30} domain={[0, 100]} tick={false} axisLine={false} />
+                                                 <Radar name="平均分數" dataKey="score" stroke="#4f46e5" fill="#4f46e5" fillOpacity={0.4} />
+                                                 <RechartsTooltip />
+                                             </RadarChart>
+                                         </ResponsiveContainer>
+                                     </div>
+                                </div>
+                                <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-center gap-4">
+                                    <div className="bg-indigo-50 p-4 rounded-xl border border-indigo-100 text-center">
+                                        <p className="text-xs font-black text-indigo-400 mb-1">【{currentSubj}】平均分數</p>
+                                        <p className={`text-4xl font-black ${avgScore >= 90 ? 'text-emerald-600' : avgScore >= 80 ? 'text-indigo-600' : 'text-orange-500'}`}>{avgScore}</p>
+                                    </div>
+                                    <div className="bg-emerald-50 p-4 rounded-xl border border-emerald-100 text-center">
+                                        <p className="text-xs font-black text-emerald-400 mb-1">【{currentSubj}】歷史最高分</p>
+                                        <p className="text-4xl font-black text-emerald-600">{maxScore}</p>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+                            <h3 className="font-black text-slate-700 flex items-center gap-2 mb-4 pb-2 border-b"><Icon name="ChartLine" className="w-5 h-5 text-indigo-500"/> 單科歷次成績走勢</h3>
+                            
+                            {availableSubjects.length > 0 ? (
+                                <>
+                                    <div className="flex gap-2 overflow-x-auto no-scrollbar mb-6 pb-2">
+                                        {availableSubjects.map(subj => (
+                                            <button key={subj} onClick={() => setAnalysisSubject(subj)}
+                                                className={`px-4 py-2 rounded-xl text-sm font-black transition-all shrink-0 ${currentSubj === subj ? 'bg-indigo-600 text-white shadow-md' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}>
+                                                {subj}
+                                            </button>
+                                        ))}
+                                    </div>
+
+                                    {window.Recharts && chartData.length > 0 ? (
+                                        <div className="w-full h-[300px] mt-4">
+                                            <ResponsiveContainer width="100%" height="100%">
+                                                <LineChart data={chartData} margin={{ top: 20, right: 30, left: 0, bottom: 10 }}>
+                                                    <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
+                                                    <XAxis dataKey="name" tick={{ fontSize: 10, fill: '#64748b', fontWeight: 'bold' }} axisLine={false} tickLine={false} dy={10} />
+                                                    <YAxis domain={[0, 100]} tick={{ fontSize: 12, fill: '#64748b', fontWeight: 'bold' }} axisLine={false} tickLine={false} dx={-10} />
+                                                    <RechartsTooltip 
+                                                        contentStyle={{ borderRadius: '1rem', border: 'none', boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)', fontWeight: 'bold' }}
+                                                        itemStyle={{ color: '#4f46e5', fontSize: '16px' }}
+                                                        labelStyle={{ color: '#64748b', marginBottom: '4px' }}
+                                                        formatter={(value) => [`${value} 分`, '成績']}
+                                                    />
+                                                    <ReferenceLine y={90} stroke="#10b981" strokeDasharray="3 3" label={{ position: 'top', value: '獎勵達標線 90', fill: '#10b981', fontSize: 10, fontWeight: 'bold' }} />
+                                                    <Line type="monotone" dataKey="score" stroke="#4f46e5" strokeWidth={4} dot={{ r: 4, strokeWidth: 2, fill: '#fff', stroke: '#4f46e5' }} activeDot={{ r: 6, fill: '#4f46e5', stroke: '#fff', strokeWidth: 2 }} />
+                                                </LineChart>
+                                            </ResponsiveContainer>
+                                        </div>
+                                    ) : (
+                                        <div className="h-[200px] flex items-center justify-center text-slate-400 font-bold bg-slate-50 rounded-xl border border-dashed border-slate-200">
+                                            {window.Recharts ? '該科目尚無足夠資料產生圖表' : '圖表模組載入中...'}
+                                        </div>
+                                    )}
+                                </>
+                            ) : (
+                                <div className="text-center py-10 text-slate-400 font-bold bg-slate-50 rounded-xl border border-dashed border-slate-200">
+                                    尚無任何考試紀錄，無法進行分析
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                );
+            };
 
             return (
                 <div className="app-container h-[100dvh] w-screen overflow-hidden bg-slate-200 flex justify-center" onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd}>
@@ -1332,24 +1453,24 @@
                             </div>
                         </div>
 
-                        <div className="main-card relative bg-slate-50">
+                        <div className="main-card relative bg-slate-50 flex flex-col flex-1 min-h-0">
                             {/* 洋洋模式內容 */}
                             {mode === 'kid' && (
-                                <div className="flex flex-col h-full relative">
+                                <div className="flex flex-col h-full relative min-h-0 flex-1">
                                     
                                     <div className="flex px-4 md:px-8 gap-1 z-10 relative bg-slate-100 shrink-0 justify-start items-end border-b-0 pt-2 overflow-x-auto no-scrollbar">
                                         <button onClick={() => setKidTab('tasks')}
-                                            className={`relative px-4 py-2.5 md:px-8 md:py-3 font-black text-sm md:text-base rounded-t-2xl transition-all duration-300 ease-in-out shrink-0
+                                            className={`whitespace-nowrap px-4 py-2.5 md:px-8 md:py-3 font-black text-sm md:text-base rounded-t-2xl transition-all duration-300 ease-in-out shrink-0
                                             ${kidTab === 'tasks' ? 'bg-gradient-to-r from-orange-400 to-rose-500 text-white z-20 pb-4 -mb-1 shadow-[0_-5px_15px_rgba(0,0,0,0.1)]' : 'bg-slate-200/70 text-slate-500 hover:bg-slate-200 z-10 border border-b-0 border-slate-300'}`}>
                                             作息表
                                         </button>
                                         <button onClick={() => setKidTab('exams')}
-                                            className={`relative px-4 py-2.5 md:px-8 md:py-3 font-black text-sm md:text-base rounded-t-2xl transition-all duration-300 ease-in-out shrink-0
+                                            className={`whitespace-nowrap px-4 py-2.5 md:px-8 md:py-3 font-black text-sm md:text-base rounded-t-2xl transition-all duration-300 ease-in-out shrink-0
                                             ${kidTab === 'exams' ? 'bg-white text-orange-600 z-20 pb-4 -mb-1 shadow-[0_-5px_15px_rgba(0,0,0,0.1)]' : 'bg-slate-200/70 text-slate-500 hover:bg-slate-200 z-10 border border-b-0 border-slate-300'}`}>
                                             考試
                                         </button>
                                         <button onClick={() => setKidTab('calendar')}
-                                            className={`relative px-4 py-2.5 md:px-8 md:py-3 font-black text-sm md:text-base rounded-t-2xl transition-all duration-300 ease-in-out shrink-0
+                                            className={`whitespace-nowrap px-4 py-2.5 md:px-8 md:py-3 font-black text-sm md:text-base rounded-t-2xl transition-all duration-300 ease-in-out shrink-0
                                             ${kidTab === 'calendar' ? 'bg-white text-emerald-600 z-20 pb-4 -mb-1 shadow-[0_-5px_15px_rgba(0,0,0,0.1)]' : 'bg-slate-200/70 text-slate-500 hover:bg-slate-200 z-10 border border-b-0 border-slate-300'}`}>
                                             行事曆
                                         </button>
@@ -1452,7 +1573,7 @@
                                         </div>
                                     )}
 
-                                    <div className="scrollable-area bg-slate-50 relative z-0 flex flex-col pt-2">
+                                    <div className="flex-1 min-h-0 overflow-y-auto bg-slate-50 relative z-0 flex flex-col pt-2">
                                         {kidTab === 'tasks' && (
                                             <div className="p-3 md:p-8 touch-pan-y h-full">
                                                 <div ref={kidListRef} className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-6 relative pb-10">
@@ -1619,7 +1740,7 @@
 
                             {/* 皇室管理模式內容 (已驗證) */}
                             {mode === 'parent' && isParentAuth && (
-                                <div className="flex flex-col h-full relative">
+                                <div className="flex flex-col h-full relative flex-1 min-h-0">
                                     <div className="bg-slate-800 px-6 py-4 md:px-8 md:py-6 text-white shrink-0 flex items-center justify-between z-20 shadow-md">
                                         <div>
                                             <div className="flex items-center gap-2 mb-1">
@@ -1630,30 +1751,39 @@
                                         </div>
                                     </div>
 
-                                    <div className="flex px-4 md:px-6 pt-4 gap-1 z-10 relative bg-slate-100 shrink-0 overflow-x-auto no-scrollbar shadow-[0_2px_5px_rgba(0,0,0,0.02)] items-end">
+                                    {/* 緊湊置左的分頁按鈕 (加入 whitespace-nowrap 與 shrink-0 解決破圖) */}
+                                    <div className="flex px-2 md:px-6 pt-4 gap-1.5 border-b border-indigo-200 z-10 relative bg-slate-100 shrink-0 overflow-x-auto no-scrollbar shadow-[0_2px_5px_rgba(0,0,0,0.02)] items-end">
                                         <button onClick={() => setParentTab('log')}
-                                            className={`relative px-4 py-2.5 md:px-6 md:py-3 font-black text-sm transition-all duration-300 ease-in-out border border-b-0 rounded-t-2xl shrink-0 ${parentTab === 'log' ? 'bg-white text-indigo-700 shadow-[0_-5px_15px_rgba(0,0,0,0.05)] z-20 pb-4 -mb-1' : 'bg-slate-200/70 text-slate-500 hover:bg-slate-200 z-10 border-slate-300'}`}>
+                                            className={`whitespace-nowrap shrink-0 px-4 py-2.5 rounded-t-xl font-black text-sm md:text-base transition-all duration-300 ease-in-out ${parentTab === 'log' ? 'bg-white text-indigo-700 shadow-[0_-4px_10px_rgba(0,0,0,0.05)] border-t border-x border-indigo-100 pb-3 -mb-px' : 'bg-indigo-50 text-indigo-400 hover:bg-indigo-100 hover:text-indigo-600 border border-transparent'}`}>
                                             作息表補登
                                         </button>
                                         <button onClick={() => setParentTab('manage')}
-                                            className={`relative px-4 py-2.5 md:px-6 md:py-3 font-black text-sm transition-all duration-300 ease-in-out border border-b-0 rounded-t-2xl shrink-0 ${parentTab === 'manage' ? 'bg-white text-indigo-700 shadow-[0_-5px_15px_rgba(0,0,0,0.05)] z-20 pb-4 -mb-1' : 'bg-slate-200/70 text-slate-500 hover:bg-slate-200 z-10 border-slate-300'}`}>
+                                            className={`whitespace-nowrap shrink-0 px-4 py-2.5 rounded-t-xl font-black text-sm md:text-base transition-all duration-300 ease-in-out ${parentTab === 'manage' ? 'bg-white text-indigo-700 shadow-[0_-4px_10px_rgba(0,0,0,0.05)] border-t border-x border-indigo-100 pb-3 -mb-px' : 'bg-indigo-50 text-indigo-400 hover:bg-indigo-100 hover:text-indigo-600 border border-transparent'}`}>
                                             作息維護
                                         </button>
                                         <button onClick={() => setParentTab('calendar')}
-                                            className={`relative px-4 py-2.5 md:px-6 md:py-3 font-black text-sm transition-all duration-300 ease-in-out border border-b-0 rounded-t-2xl shrink-0 ${parentTab === 'calendar' ? 'bg-white text-indigo-700 shadow-[0_-5px_15px_rgba(0,0,0,0.05)] z-20 pb-4 -mb-1' : 'bg-slate-200/70 text-slate-500 hover:bg-slate-200 z-10 border-slate-300'}`}>
+                                            className={`whitespace-nowrap shrink-0 px-4 py-2.5 rounded-t-xl font-black text-sm md:text-base transition-all duration-300 ease-in-out ${parentTab === 'calendar' ? 'bg-white text-indigo-700 shadow-[0_-4px_10px_rgba(0,0,0,0.05)] border-t border-x border-indigo-100 pb-3 -mb-px' : 'bg-indigo-50 text-indigo-400 hover:bg-indigo-100 hover:text-indigo-600 border border-transparent'}`}>
                                             行事曆
                                         </button>
                                         <button onClick={() => setParentTab('exams')}
-                                            className={`relative px-4 py-2.5 md:px-6 md:py-3 font-black text-sm transition-all duration-300 ease-in-out border border-b-0 rounded-t-2xl shrink-0 ${parentTab === 'exams' ? 'bg-white text-indigo-700 shadow-[0_-5px_15px_rgba(0,0,0,0.05)] z-20 pb-4 -mb-1' : 'bg-slate-200/70 text-slate-500 hover:bg-slate-200 z-10 border-slate-300'}`}>
+                                            className={`whitespace-nowrap shrink-0 px-4 py-2.5 rounded-t-xl font-black text-sm md:text-base transition-all duration-300 ease-in-out ${parentTab === 'exams' ? 'bg-white text-indigo-700 shadow-[0_-4px_10px_rgba(0,0,0,0.05)] border-t border-x border-indigo-100 pb-3 -mb-px' : 'bg-indigo-50 text-indigo-400 hover:bg-indigo-100 hover:text-indigo-600 border border-transparent'}`}>
                                             考試設定/紀錄
                                         </button>
+                                        <button onClick={() => setParentTab('analysis')}
+                                            className={`whitespace-nowrap shrink-0 px-4 py-2.5 rounded-t-xl font-black text-sm md:text-base transition-all duration-300 ease-in-out ${parentTab === 'analysis' ? 'bg-white text-indigo-700 shadow-[0_-4px_10px_rgba(0,0,0,0.05)] border-t border-x border-indigo-100 pb-3 -mb-px' : 'bg-indigo-50 text-indigo-400 hover:bg-indigo-100 hover:text-indigo-600 border border-transparent'}`}>
+                                            成績圖表分析
+                                        </button>
                                         <button onClick={() => setParentTab('rewards')}
-                                            className={`relative px-4 py-2.5 md:px-6 md:py-3 font-black text-sm transition-all duration-300 ease-in-out border border-b-0 rounded-t-2xl shrink-0 ${parentTab === 'rewards' ? 'bg-white text-indigo-700 shadow-[0_-5px_15px_rgba(0,0,0,0.05)] z-20 pb-4 -mb-1' : 'bg-slate-200/70 text-slate-500 hover:bg-slate-200 z-10 border-slate-300'}`}>
+                                            className={`whitespace-nowrap shrink-0 px-4 py-2.5 rounded-t-xl font-black text-sm md:text-base transition-all duration-300 ease-in-out ${parentTab === 'rewards' ? 'bg-white text-indigo-700 shadow-[0_-4px_10px_rgba(0,0,0,0.05)] border-t border-x border-indigo-100 pb-3 -mb-px' : 'bg-indigo-50 text-indigo-400 hover:bg-indigo-100 hover:text-indigo-600 border border-transparent'}`}>
                                             獎勵設定/紀錄
+                                        </button>
+                                        <button onClick={() => setParentTab('settings')}
+                                            className={`whitespace-nowrap shrink-0 px-4 py-2.5 rounded-t-xl font-black text-sm md:text-base transition-all duration-300 ease-in-out ${parentTab === 'settings' ? 'bg-white text-indigo-700 shadow-[0_-4px_10px_rgba(0,0,0,0.05)] border-t border-x border-indigo-100 pb-3 -mb-px' : 'bg-indigo-50 text-indigo-400 hover:bg-indigo-100 hover:text-indigo-600 border border-transparent'}`}>
+                                            系統設定
                                         </button>
                                     </div>
 
-                                    <div className="scrollable-area bg-white shadow-inner p-4 md:p-6 relative z-0 border-t-2 border-slate-200 pb-20">
+                                    <div className="flex-1 min-h-0 overflow-y-auto bg-white p-4 md:p-6 relative z-0">
                                         
                                         {/* 分頁 1：作息表補登 */}
                                         {parentTab === 'log' && (
@@ -1746,7 +1876,49 @@
                                             </div>
                                         )}
 
-                                        {/* 分頁 2：行事曆管理 */}
+                                        {/* 分頁 2：作息維護 */}
+                                        {parentTab === 'manage' && (
+                                            <div className="max-w-4xl mx-auto space-y-4">
+                                                <button onClick={addTask} className="w-full py-5 border-2 border-dashed border-indigo-300 rounded-2xl text-indigo-500 font-black text-base hover:bg-indigo-50 flex items-center justify-center gap-2 transition-all">
+                                                    <Icon name="Plus" className="w-5 h-5" /> 新增作息項目
+                                                </button>
+                                                <div ref={manageListRef} className="space-y-3">
+                                                    {allTasks.map((task) => (
+                                                        <div key={task.id} data-id={task.id} className="task-item bg-white border border-slate-200 p-3 md:p-4 rounded-xl shadow-sm flex flex-col relative overflow-hidden group">
+                                                            {deleteConfirmId === task.id && (
+                                                                <div className="absolute inset-0 bg-red-600/95 z-20 flex flex-col md:flex-row items-center justify-center p-4 text-white gap-4">
+                                                                    <p className="font-black text-base md:text-lg m-0">確定刪除此作息？</p>
+                                                                    <div className="flex gap-2">
+                                                                        <button onClick={() => confirmRemoveTask(task.id)} className="bg-white text-red-600 px-4 py-2 rounded-lg font-black shadow-md">刪除</button>
+                                                                        <button onClick={() => setDeleteConfirmId(null)} className="bg-red-800 text-white px-4 py-2 rounded-lg font-black border border-red-400">取消</button>
+                                                                    </div>
+                                                                </div>
+                                                            )}
+                                                            <div className="flex flex-col md:flex-row md:items-center gap-2 md:gap-4">
+                                                                <div className="flex items-center gap-2 flex-1">
+                                                                    <div className="w-8 h-8 rounded shrink-0 bg-slate-100 flex items-center justify-center drag-handle touch-none cursor-grab text-slate-400 hover:text-indigo-600 hover:bg-indigo-50">
+                                                                        <Icon name="GripVertical" className="w-5 h-5 pointer-events-none" />
+                                                                    </div>
+                                                                    <input value={task.title} onChange={(e) => updateTask(task.id, 'title', e.target.value)} className="flex-1 text-base md:text-lg font-bold bg-transparent border border-slate-100 hover:border-slate-300 focus:border-indigo-400 focus:bg-slate-50 rounded px-3 py-1.5 outline-none transition-all placeholder:text-slate-300" placeholder="輸入作息名稱" />
+                                                                </div>
+                                                                <div className="flex items-center justify-between md:justify-end gap-3 pl-10 md:pl-0">
+                                                                    <div className="flex gap-1">
+                                                                        {baseDays.map(d => (
+                                                                            <button key={d.id} onClick={() => toggleTaskRule(task.id, d.id)} className={`w-7 h-7 md:w-8 md:h-8 rounded text-[10px] md:text-xs font-black transition-all ${task.rule.includes(d.id) ? 'bg-indigo-600 text-white shadow-sm' : 'bg-slate-100 text-slate-400 hover:bg-slate-200'}`}>{d.label}</button>
+                                                                        ))}
+                                                                    </div>
+                                                                    <button onClick={() => setDeleteConfirmId(task.id)} className="p-1.5 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded shrink-0 transition-all md:opacity-0 group-hover:opacity-100">
+                                                                        <Icon name="Trash2" className="w-5 h-5" />
+                                                                    </button>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {/* 分頁 3：行事曆管理 */}
                                         {parentTab === 'calendar' && (
                                             <div className="max-w-3xl mx-auto space-y-4">
                                                 <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
@@ -1812,7 +1984,7 @@
                                             </div>
                                         )}
 
-                                        {/* 分頁 3：考試紀錄管理 */}
+                                        {/* 分頁 4：考試設定/紀錄 */}
                                         {parentTab === 'exams' && (
                                             <div className="max-w-4xl mx-auto space-y-6">
                                                 
@@ -1966,7 +2138,10 @@
                                             </div>
                                         )}
 
-                                        {/* 分頁 4：獎勵紀錄 */}
+                                        {/* 分頁 5：成績圖表分析 */}
+                                        {parentTab === 'analysis' && renderParentAnalysis()}
+
+                                        {/* 分頁 6：獎勵設定/紀錄 */}
                                         {parentTab === 'rewards' && (
                                             <div className="max-w-3xl mx-auto space-y-6">
                                                 
@@ -2094,44 +2269,47 @@
                                             </div>
                                         )}
 
-                                        {/* 分頁 5：作息維護 */}
-                                        {parentTab === 'manage' && (
-                                            <div className="max-w-4xl mx-auto space-y-4">
-                                                <button onClick={addTask} className="w-full py-5 border-2 border-dashed border-indigo-300 rounded-2xl text-indigo-500 font-black text-base hover:bg-indigo-50 flex items-center justify-center gap-2 transition-all">
-                                                    <Icon name="Plus" className="w-5 h-5" /> 新增作息項目
-                                                </button>
-                                                <div ref={manageListRef} className="space-y-3">
-                                                    {allTasks.map((task) => (
-                                                        <div key={task.id} data-id={task.id} className="task-item bg-white border border-slate-200 p-3 md:p-4 rounded-xl shadow-sm flex flex-col relative overflow-hidden group">
-                                                            {deleteConfirmId === task.id && (
-                                                                <div className="absolute inset-0 bg-red-600/95 z-20 flex flex-col md:flex-row items-center justify-center p-4 text-white gap-4">
-                                                                    <p className="font-black text-base md:text-lg m-0">確定刪除此作息？</p>
-                                                                    <div className="flex gap-2">
-                                                                        <button onClick={() => confirmRemoveTask(task.id)} className="bg-white text-red-600 px-4 py-2 rounded-lg font-black shadow-md">刪除</button>
-                                                                        <button onClick={() => setDeleteConfirmId(null)} className="bg-red-800 text-white px-4 py-2 rounded-lg font-black border border-red-400">取消</button>
-                                                                    </div>
-                                                                </div>
-                                                            )}
-                                                            <div className="flex flex-col md:flex-row md:items-center gap-2 md:gap-4">
-                                                                <div className="flex items-center gap-2 flex-1">
-                                                                    <div className="w-8 h-8 rounded shrink-0 bg-slate-100 flex items-center justify-center drag-handle touch-none cursor-grab text-slate-400 hover:text-indigo-600 hover:bg-indigo-50">
-                                                                        <Icon name="GripVertical" className="w-5 h-5 pointer-events-none" />
-                                                                    </div>
-                                                                    <input value={task.title} onChange={(e) => updateTask(task.id, 'title', e.target.value)} className="flex-1 text-base md:text-lg font-bold bg-transparent border border-slate-100 hover:border-slate-300 focus:border-indigo-400 focus:bg-slate-50 rounded px-3 py-1.5 outline-none transition-all placeholder:text-slate-300" placeholder="輸入作息名稱" />
-                                                                </div>
-                                                                <div className="flex items-center justify-between md:justify-end gap-3 pl-10 md:pl-0">
-                                                                    <div className="flex gap-1">
-                                                                        {baseDays.map(d => (
-                                                                            <button key={d.id} onClick={() => toggleTaskRule(task.id, d.id)} className={`w-7 h-7 md:w-8 md:h-8 rounded text-[10px] md:text-xs font-black transition-all ${task.rule.includes(d.id) ? 'bg-indigo-600 text-white shadow-sm' : 'bg-slate-100 text-slate-400 hover:bg-slate-200'}`}>{d.label}</button>
-                                                                        ))}
-                                                                    </div>
-                                                                    <button onClick={() => setDeleteConfirmId(task.id)} className="p-1.5 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded shrink-0 transition-all md:opacity-0 group-hover:opacity-100">
-                                                                        <Icon name="Trash2" className="w-5 h-5" />
-                                                                    </button>
-                                                                </div>
+                                        {/* 分頁 7：系統設定 */}
+                                        {parentTab === 'settings' && (
+                                            <div className="max-w-4xl mx-auto space-y-6">
+                                                <div className="bg-slate-800 rounded-2xl border border-slate-700 p-6 shadow-lg relative overflow-hidden">
+                                                    <div className="absolute -right-10 -bottom-10 opacity-10"><Icon name="Settings2" className="w-40 h-40 text-white" /></div>
+                                                    <h3 className="font-black text-white text-lg flex items-center gap-2 mb-4 relative z-10"><Icon name="Lock" className="w-5 h-5 text-indigo-400"/> 系統安全與資料備份</h3>
+                                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 relative z-10">
+                                                        <div className="bg-slate-700/50 p-4 rounded-xl border border-slate-600">
+                                                            <h4 className="text-sm font-bold text-indigo-300 mb-3">安全鎖定設定</h4>
+                                                            <div className="flex items-center gap-2 mb-3">
+                                                                <input type="password" value={settingOldPin} onChange={e=>setSettingOldPin(e.target.value.replace(/\D/g,'').slice(0,4))} placeholder="輸入舊密碼" className="flex-1 bg-slate-800 border border-slate-600 text-white font-bold rounded-lg px-3 py-2 outline-none focus:border-indigo-400 text-center tracking-widest" />
+                                                                <input type="password" value={settingNewPin} onChange={e=>setSettingNewPin(e.target.value.replace(/\D/g,'').slice(0,4))} placeholder="設定 4 位新密碼" className="flex-1 bg-slate-800 border border-slate-600 text-white font-bold rounded-lg px-3 py-2 outline-none focus:border-indigo-400 text-center tracking-widest" />
                                                             </div>
+                                                            <button onClick={() => {
+                                                                const currentPin = localStorage.getItem(STORAGE_KEYS.PARENT_PIN) || '0000';
+                                                                if(settingOldPin !== currentPin) return alert("❌ 舊密碼輸入錯誤！");
+                                                                if(settingNewPin.length !== 4) return alert("❌ 新密碼必須為 4 位數字！");
+                                                                localStorage.setItem(STORAGE_KEYS.PARENT_PIN, settingNewPin);
+                                                                setSettingOldPin(''); setSettingNewPin('');
+                                                                alert("✅ 密碼更新成功！下次請使用新密碼登入。");
+                                                            }} className="w-full bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-2 rounded-lg font-bold text-sm transition-colors mb-3">確認修改密碼</button>
+                                                            
+                                                            <button onClick={bindBiometrics} className={`w-full py-2.5 rounded-lg font-bold text-sm flex items-center justify-center gap-2 transition-colors ${hasBioBound ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/50' : 'bg-slate-600 hover:bg-slate-500 text-white'}`}>
+                                                                <Icon name="Fingerprint" className="w-4 h-4" /> {hasBioBound ? "生物辨識已綁定 (點擊重新綁定)" : "綁定平板生物辨識"}
+                                                            </button>
                                                         </div>
-                                                    ))}
+                                                        <div className="bg-slate-700/50 p-4 rounded-xl border border-slate-600 flex flex-col justify-center">
+                                                            <h4 className="text-sm font-bold text-indigo-300 mb-3">資料備份與還原 (離線檔案)</h4>
+                                                            <div className="flex gap-2">
+                                                                <button onClick={handleExportData} className="flex-1 py-3 bg-slate-600 hover:bg-slate-500 text-white rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-colors shadow-sm">
+                                                                    <Icon name="Download" className="w-4 h-4" /> 匯出備份檔
+                                                                </button>
+                                                                <button onClick={() => fileInputRef.current.click()} className="flex-1 py-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-colors shadow-sm">
+                                                                    <Icon name="Upload" className="w-4 h-4" /> 從檔案還原
+                                                                </button>
+                                                            </div>
+                                                            <p className="text-[10px] text-slate-400 mt-4 leading-relaxed bg-slate-800 p-2 rounded-lg border border-slate-600/50">
+                                                                <strong className="text-orange-400">強烈建議：</strong>每月定期匯出資料保存至電腦或雲端硬碟。若更換設備或清除瀏覽器紀錄，可隨時「從檔案還原」救回所有設定與作息紀錄。
+                                                            </p>
+                                                        </div>
+                                                    </div>
                                                 </div>
                                             </div>
                                         )}
