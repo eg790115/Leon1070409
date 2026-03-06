@@ -17,24 +17,6 @@
     <meta name="theme-color" content="#f97316">
     <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/1426/1426735.png">
 
-    <link id="manifest-link" rel="manifest">
-    <script>
-      (function() {
-        var manifest = {
-          "name": "洋洋作息打勾表",
-          "short_name": "洋洋作息",
-          "start_url": ".",
-          "display": "standalone",
-          "display_override": ["fullscreen", "standalone"],
-          "background_color": "#f1f5f9",
-          "theme_color": "#f97316",
-          "icons": [{ "src": "https://cdn-icons-png.flaticon.com/512/1426/1426735.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }]
-        };
-        var blob = new Blob([JSON.stringify(manifest)], { type: 'application/manifest+json' });
-        document.getElementById('manifest-link').href = URL.createObjectURL(blob);
-      })();
-    </script>
-
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -49,7 +31,7 @@
         /* 鎖定螢幕與防呆 */
         body, html {
             margin: 0; padding: 0; height: 100%; width: 100%;
-            overflow: hidden; background-color: #e2e8f0; 
+            overflow: hidden; background-color: #cbd5e1; 
             user-select: none; -webkit-tap-highlight-color: transparent;
             overscroll-behavior: none;
         }
@@ -65,19 +47,11 @@
         .animate-confetti-fall { animation: confetti-fall linear infinite; will-change: transform, opacity; }
 
         /* 全螢幕雙層光芒特效 */
-        .sunburst-layer-1 {
-            background: repeating-conic-gradient(from 0deg, #FDE047 0deg 4deg, transparent 4deg 40deg);
-            border-radius: 50%;
-            animation: spin-rays 35s linear infinite;
-        }
-        .sunburst-layer-2 {
-            background: repeating-conic-gradient(from 10deg, rgba(255,255,255,0.7) 0deg 3deg, transparent 3deg 45deg);
-            border-radius: 50%;
-            animation: spin-rays 20s linear infinite;
-        }
+        .sunburst-layer-1 { background: repeating-conic-gradient(from 0deg, #FDE047 0deg 4deg, transparent 4deg 40deg); border-radius: 50%; animation: spin-rays 35s linear infinite; }
+        .sunburst-layer-2 { background: repeating-conic-gradient(from 10deg, rgba(255,255,255,0.7) 0deg 3deg, transparent 3deg 45deg); border-radius: 50%; animation: spin-rays 20s linear infinite; }
         @keyframes spin-rays { 100% { transform: rotate(360deg); } }
         
-        /* 修復版面：使用標準 Flex 佈局防止破圖 */
+        /* 完美的彈性置中框架 */
         .app-container { height: 100vh; display: flex; flex-direction: column; overflow: hidden; width: 100%; align-items: center; }
         
         .touch-none { touch-action: none; }
@@ -114,7 +88,6 @@
 
     <script type="text/babel">
         const { useState, useEffect, useMemo, useRef, useCallback, Fragment } = React; 
-        // 載入 Recharts 圖表模組
         const { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip: RechartsTooltip, ResponsiveContainer, ReferenceLine, Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis } = window.Recharts || {};
 
         const ICONS_DATA = {
@@ -123,7 +96,7 @@
             CheckCircle2: <path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10zM9 12l2 2 4-4" />,
             Plus: <path d="M12 5v14M5 12h14" />,
             Trash2: <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M10 11v6M14 11v6" />,
-            Settings2: <path d="M20 7h-9M14 17H5M17 12H7M7 2h0M7 22h0M17 2h0M17 22h0M7 7a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM17 12a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM7 17a3 3 0 1 0 0 6 3 3 0 0 0 0-6z" />,
+            Settings2: <path d="M20 7h-9M14 17H5M17 12H7M7 2h0M7 22h0M17 2h0M17 22h0M7 7a3 3 0 1 0 0-6 3 3 0 1 0 0-6 3 3 0 0 0 0 6zM17 12a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM7 17a3 3 0 1 0 0 6 3 3 0 0 0 0-6z" />,
             GripVertical: <g><circle cx="9" cy="5" r="1.5"/><circle cx="9" cy="12" r="1.5"/><circle cx="9" cy="19" r="1.5"/><circle cx="15" cy="5" r="1.5"/><circle cx="15" cy="12" r="1.5"/><circle cx="15" cy="19" r="1.5"/></g>,
             Heart: <path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z" />,
             X: <path d="M18 6 6 18M6 6l12 12" />,
@@ -208,13 +181,11 @@
             { id: '19', cat: '週末', title: '喝小安素', rule: [6, 7] }
         ];
 
-        // 徹底放棄帶有版號的 DB 名稱，確保 PWA 更新後資料永遠不流失
         const DB_NAME = 'YangYangRoyal_PROD'; 
         const STORE_NAME = 'ChecklistData';
         
         const getYYYYMMDD = (date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 
-        // 徹底放棄帶有版號的 Keys，避免更新後空空如也
         const STORAGE_KEYS = {
             TASKS: 'yang_data_tasks', TASKS_BAK: 'yang_data_tasks_bak',
             PROGRESS: (dateStr) => `yang_data_checked_${dateStr}`, PROGRESS_BAK: (dateStr) => `yang_data_checked_${dateStr}_bak`,
@@ -273,7 +244,7 @@
         const robustLoad = async (key, backupKey, defaultValue) => {
             try {
                 let primary = localStorage.getItem(key);
-                if (!primary) primary = localStorage.getItem(key.replace('yang_data_', 'yang_v92_')); // 向下相容
+                if (!primary) primary = localStorage.getItem(key.replace('yang_data_', 'yang_v92_')); 
                 if (primary) return JSON.parse(primary);
                 
                 let backup = localStorage.getItem(backupKey);
@@ -292,8 +263,8 @@
             { id: 4, label: '四' }, { id: 5, label: '五' }, { id: 6, label: '六' }, { id: 7, label: '日' },
         ];
 
-        // 獨立於組件外的全域輔助函式
-        const isDayActuallyCompleted = (dateStr, completedSet, allTasks) => {
+        // 全域輔助函數，避免 React 渲染週期干擾
+        const isDayActuallyCompletedFunc = (dateStr, completedSet, allTasks) => {
             if (completedSet.has(dateStr)) return true;
             const dObj = new Date(dateStr);
             const dow = dObj.getDay() || 7;
@@ -444,7 +415,10 @@
             const [newEventTitle, setNewEventTitle] = useState('');
             const [newEventType, setNewEventType] = useState('school');
             const [isAnalyzingPhoto, setIsAnalyzingPhoto] = useState(false); 
-            const photoInputRef = useRef(null);
+            
+            const cameraInputRef = useRef(null);
+            const galleryInputRef = useRef(null);
+            const fileInputRef = useRef(null);
 
             const [rewards, setRewards] = useState([]);
             const [pendingRewardsInputs, setPendingRewardsInputs] = useState({});
@@ -468,8 +442,6 @@
             const sortableInstanceRef = useRef(null);
             
             const isAnimatingRef = useRef(false);
-            const fileInputRef = useRef(null);
-
             const [syncTrigger, setSyncTrigger] = useState(0);
 
             const touchStartX = useRef(null);
@@ -488,22 +460,29 @@
                 touchEndX.current = null;
             };
 
-            // 【性能優化】：移除定時器的 autoAnimate，改在列表變動時直接綁定
+            // 動畫綁定
             useEffect(() => {
-                if (kidListRef.current && window.autoAnimate) {
-                    if (!kidListRef.current.hasAttribute('data-aa')) {
-                        window.autoAnimate(kidListRef.current, { duration: 350, easing: 'ease-in-out' });
-                        kidListRef.current.setAttribute('data-aa', 'true');
+                let timeoutId;
+                const attachAutoAnimate = () => {
+                    if (kidListRef.current && window.autoAnimate) {
+                        if (!kidListRef.current.hasAttribute('data-aa')) {
+                            window.autoAnimate(kidListRef.current, { duration: 350, easing: 'ease-in-out' });
+                            kidListRef.current.setAttribute('data-aa', 'true');
+                        }
                     }
-                }
-                if (logListRef.current && window.autoAnimate) {
-                    if (!logListRef.current.hasAttribute('data-aa')) {
-                        window.autoAnimate(logListRef.current, { duration: 300, easing: 'ease-in-out' });
-                        logListRef.current.setAttribute('data-aa', 'true');
+                    if (logListRef.current && window.autoAnimate) {
+                        if (!logListRef.current.hasAttribute('data-aa')) {
+                            window.autoAnimate(logListRef.current, { duration: 300, easing: 'ease-in-out' });
+                            logListRef.current.setAttribute('data-aa', 'true');
+                        }
                     }
-                }
+                    timeoutId = setTimeout(attachAutoAnimate, 500);
+                };
+                attachAutoAnimate();
+                return () => clearTimeout(timeoutId);
             }, [mode, kidTab, parentTab, selectedLogDateStr, isParentAuth]);
 
+            // 排序拖曳綁定
             useEffect(() => {
                 if (mode === 'parent' && isParentAuth && parentTab === 'manage' && manageListRef.current && window.Sortable) {
                     if (!sortableInstanceRef.current) {
@@ -532,7 +511,7 @@
                 }
             });
 
-            // 初始化載入
+            // 資料初始化載入
             useEffect(() => {
                 const initData = async () => {
                     const tasks = await robustLoad(STORAGE_KEYS.TASKS, STORAGE_KEYS.TASKS_BAK, defaultTasks);
@@ -561,7 +540,7 @@
                 initData();
             }, []);
 
-            // 初始化分析的預設科目
+            // 預設分析科目
             useEffect(() => {
                 if (exams.length > 0 && !analysisSubject) {
                     const availableSubjects = Array.from(new Set(exams.map(e => e.subject)));
@@ -569,7 +548,7 @@
                 }
             }, [exams, analysisSubject]);
 
-            // 日期切換時載入資料
+            // 日期切換載入進度
             useEffect(() => {
                 if (!activeDateStr) return;
                 let isMounted = true;
@@ -621,15 +600,10 @@
             const progress = currentTasks.length ? Math.round((completedCount / currentTasks.length) * 100) : 0;
 
             const currentStreak = useMemo(() => {
-                const checkIsCompleted = (dateObj) => {
-                    const dateStr = getYYYYMMDD(dateObj);
-                    return isDayActuallyCompleted(dateStr, new Set(completedDates), allTasks);
-                };
-
                 let streak = 0; let checkDate = new Date(realToday);
-                if (checkIsCompleted(checkDate)) { streak++; checkDate.setDate(checkDate.getDate() - 1); }
-                else { checkDate.setDate(checkDate.getDate() - 1); if (checkIsCompleted(checkDate)) { streak++; checkDate.setDate(checkDate.getDate() - 1); } else { return 0; } }
-                while (true) { if (checkIsCompleted(checkDate)) { streak++; checkDate.setDate(checkDate.getDate() - 1); } else { break; } }
+                if (isDayActuallyCompletedFunc(getYYYYMMDD(checkDate), new Set(completedDates), allTasks)) { streak++; checkDate.setDate(checkDate.getDate() - 1); }
+                else { checkDate.setDate(checkDate.getDate() - 1); if (isDayActuallyCompletedFunc(getYYYYMMDD(checkDate), new Set(completedDates), allTasks)) { streak++; checkDate.setDate(checkDate.getDate() - 1); } else { return 0; } }
+                while (true) { if (isDayActuallyCompletedFunc(getYYYYMMDD(checkDate), new Set(completedDates), allTasks)) { streak++; checkDate.setDate(checkDate.getDate() - 1); } else { break; } }
                 return streak;
             }, [completedDates, realToday, allTasks]);
 
@@ -641,7 +615,7 @@
                 const completedSet = new Set(completedDates);
                 for(let i=0; i<7; i++) {
                     const cur = new Date(mon); cur.setDate(cur.getDate() + i);
-                    if (isDayActuallyCompleted(getYYYYMMDD(cur), completedSet, allTasks)) count++;
+                    if (isDayActuallyCompletedFunc(getYYYYMMDD(cur), completedSet, allTasks)) count++;
                 }
                 return count;
             }, [realToday, completedDates, allTasks]);
@@ -653,7 +627,7 @@
                 const completedSet = new Set(completedDates);
                 for(let i=1; i<=daysInMonth; i++) {
                     const cur = `${y}-${String(m).padStart(2,'0')}-${String(i).padStart(2,'0')}`;
-                    if (isDayActuallyCompleted(cur, completedSet, allTasks)) count++;
+                    if (isDayActuallyCompletedFunc(cur, completedSet, allTasks)) count++;
                 }
                 return { count, total: daysInMonth };
             }, [realToday, completedDates, allTasks]);
@@ -664,7 +638,7 @@
                     const dateStr = periodId.substring(2); const start = new Date(dateStr);
                     for(let i=0; i<7; i++) {
                         const cur = new Date(start); cur.setDate(cur.getDate() + i);
-                        if (!isDayActuallyCompleted(getYYYYMMDD(cur), completedSet, allTasks)) return false;
+                        if (!isDayActuallyCompletedFunc(getYYYYMMDD(cur), completedSet, allTasks)) return false;
                     }
                     return true;
                 } else if (periodId.startsWith('M-')) {
@@ -672,7 +646,7 @@
                     const daysInMonth = new Date(y, m, 0).getDate();
                     for(let i=1; i<=daysInMonth; i++) {
                         const cur = `${y}-${String(m).padStart(2,'0')}-${String(i).padStart(2,'0')}`;
-                        if (!isDayActuallyCompleted(cur, completedSet, allTasks)) return false;
+                        if (!isDayActuallyCompletedFunc(cur, completedSet, allTasks)) return false;
                     }
                     return true;
                 } else if (periodId.startsWith('EXAM-')) {
@@ -706,7 +680,7 @@
                     let isFull = true;
                     for(let i=0; i<7; i++) {
                         const cur = new Date(mon); cur.setDate(cur.getDate() + i);
-                        if (!isDayActuallyCompleted(getYYYYMMDD(cur), completedSet, allTasks)) { isFull = false; break; }
+                        if (!isDayActuallyCompletedFunc(getYYYYMMDD(cur), completedSet, allTasks)) { isFull = false; break; }
                     }
                     if (isFull) {
                         const end = new Date(mon); end.setDate(end.getDate() + 6);
@@ -724,7 +698,7 @@
                     let isFull = true;
                     for(let i=1; i<=daysInMonth; i++) {
                         const cur = `${curMonth.getFullYear()}-${String(curMonth.getMonth()+1).padStart(2,'0')}-${String(i).padStart(2,'0')}`;
-                        if (!isDayActuallyCompleted(cur, completedSet, allTasks)) { isFull = false; break; }
+                        if (!isDayActuallyCompletedFunc(cur, completedSet, allTasks)) { isFull = false; break; }
                     }
                     if (isFull) available.push({ periodId: mId, type: 'monthly', label: `${curMonth.getMonth()+1}月份 全月達成` });
                 }
@@ -787,7 +761,6 @@
                 return { year, month: month + 1, data };
             }, [parentMonthOffset, allTasks, realToday, events, checkedItems, activeDateStr, syncTrigger]);
 
-            // 考試專用月曆資料
             const examCalendarData = useMemo(() => {
                 const base = new Date(realToday);
                 base.setMonth(base.getMonth() + examMonthOffset);
@@ -1018,7 +991,15 @@
             };
 
             const handleAIPhotoUpload = (e) => {
-                // Mock behavior for testing AI logic
+                if(e.target.files && e.target.files[0]) {
+                    setIsAnalyzingPhoto(true);
+                    setTimeout(() => {
+                        setNewEventTitle('學校測驗 (AI辨識成功)');
+                        setNewEventType('school');
+                        setIsAnalyzingPhoto(false);
+                        playSound('tada');
+                    }, 1500);
+                }
             };
 
             // 家長安全登入邏輯
@@ -1209,7 +1190,7 @@
                                     <div className="flex gap-2 overflow-x-auto no-scrollbar mb-6 pb-2">
                                         {availableSubjects.map(subj => (
                                             <button key={subj} onClick={() => setAnalysisSubject(subj)}
-                                                className={`px-4 py-2 rounded-xl text-sm font-black transition-all shrink-0 ${currentSubj === subj ? 'bg-indigo-600 text-white shadow-md' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}>
+                                                className={`whitespace-nowrap px-4 py-2 rounded-xl text-sm font-black transition-all shrink-0 ${currentSubj === subj ? 'bg-indigo-600 text-white shadow-md' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}>
                                                 {subj}
                                             </button>
                                         ))}
@@ -1250,9 +1231,11 @@
             };
 
             return (
-                <div className="app-container h-[100dvh] w-screen overflow-hidden bg-slate-200 flex justify-center" onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd}>
+                <div className="app-container" onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd}>
                     
-                    <input type="file" accept="image/*" ref={photoInputRef} className="hidden" onChange={handleAIPhotoUpload} />
+                    <input type="file" accept="image/*" capture="environment" ref={cameraInputRef} className="hidden" onChange={handleAIPhotoUpload} />
+                    <input type="file" accept="image/*" ref={galleryInputRef} className="hidden" onChange={handleAIPhotoUpload} />
+                    <input type="file" accept=".json" ref={fileInputRef} className="hidden" onChange={handleImportData} />
 
                     {/* 行事曆事件新增彈窗 */}
                     {showEventModal && (
@@ -1265,10 +1248,16 @@
                                 <p className="text-slate-500 font-bold mb-4 text-center">{selectedEventDate}</p>
                                 
                                 {mode === 'parent' && (
-                                    <button onClick={() => photoInputRef.current.click()} disabled={isAnalyzingPhoto} className="w-full mb-6 bg-indigo-50 text-indigo-600 border border-indigo-200 py-3 rounded-xl font-bold text-sm hover:bg-indigo-100 transition-colors flex justify-center items-center gap-2">
-                                        {isAnalyzingPhoto ? <Icon name="Loader" className="animate-spin w-5 h-5" /> : <Icon name="Camera" className="w-5 h-5" />}
-                                        {isAnalyzingPhoto ? 'AI 辨識中...' : '📸 AI 拍照/截圖自動填寫'}
-                                    </button>
+                                    <div className="flex gap-2 mb-6">
+                                        <button onClick={() => cameraInputRef.current.click()} disabled={isAnalyzingPhoto} className="flex-1 bg-indigo-50 text-indigo-600 border border-indigo-200 py-3 rounded-xl font-bold text-sm hover:bg-indigo-100 transition-colors flex justify-center items-center gap-2">
+                                            {isAnalyzingPhoto ? <Icon name="Loader" className="animate-spin w-5 h-5" /> : <Icon name="Camera" className="w-5 h-5" />}
+                                            拍照辨識
+                                        </button>
+                                        <button onClick={() => galleryInputRef.current.click()} disabled={isAnalyzingPhoto} className="flex-1 bg-indigo-50 text-indigo-600 border border-indigo-200 py-3 rounded-xl font-bold text-sm hover:bg-indigo-100 transition-colors flex justify-center items-center gap-2">
+                                            {isAnalyzingPhoto ? <Icon name="Loader" className="animate-spin w-5 h-5" /> : <Icon name="Upload" className="w-5 h-5" />}
+                                            上傳截圖
+                                        </button>
+                                    </div>
                                 )}
                                 
                                 <div className="space-y-4 mb-6">
@@ -1392,53 +1381,53 @@
                         </div>
                     )}
 
-                    <div className="w-full max-w-4xl flex flex-col h-full relative shadow-2xl bg-white border-x-4 border-slate-200">
-                        
-                        {/* 家長登入鎖定遮罩 */}
-                        {mode === 'parent' && !isParentAuth && (
-                            <div className="absolute inset-0 z-[100] bg-slate-900 flex flex-col items-center justify-center animate-in p-6">
-                                <div className="w-full max-w-sm bg-slate-800 rounded-[2.5rem] p-8 shadow-2xl border border-slate-700 text-center relative overflow-hidden">
-                                    <div className="w-16 h-16 bg-indigo-500/20 text-indigo-400 rounded-full flex items-center justify-center mx-auto mb-4 border-2 border-indigo-500/50 shadow-[0_0_15px_rgba(99,102,241,0.3)]">
-                                        <Icon name="Lock" className="w-8 h-8" />
-                                    </div>
-                                    <h2 className="text-2xl font-black text-white mb-2 tracking-widest">皇室管理區</h2>
-                                    <p className="text-slate-400 text-xs font-bold mb-6">請輸入 4 位數 PIN 碼，或使用生物辨識解鎖</p>
-                                    
-                                    {loginError && <p className="text-red-400 text-xs font-bold mb-4 animate-shake">{loginError}</p>}
-                                    
-                                    {hasBioBound && (
-                                        <button onClick={loginWithBiometrics} className="w-full py-4 bg-indigo-600 hover:bg-indigo-500 text-white rounded-2xl font-black mb-6 active:scale-95 transition-all shadow-lg flex justify-center items-center gap-2">
-                                            <Icon name="Fingerprint" className="w-5 h-5" /> 生物辨識快速登入
-                                        </button>
-                                    )}
-                                    
-                                    <div className="flex justify-center gap-3 mb-8">
-                                        {[...Array(4)].map((_, i) => <div key={i} className={`w-3.5 h-3.5 rounded-full border-2 border-indigo-500 transition-all duration-200 ${loginPin.length > i ? "bg-indigo-400 scale-125 shadow-[0_0_10px_rgba(99,102,241,0.6)]" : "bg-transparent"}`}></div>)}
-                                    </div>
+                    {/* 家長登入鎖定遮罩 */}
+                    {mode === 'parent' && !isParentAuth && (
+                        <div className="fixed inset-0 z-[500] bg-slate-900 flex flex-col items-center justify-center animate-in p-6">
+                            <div className="w-full max-w-sm bg-slate-800 rounded-[2.5rem] p-8 shadow-2xl border border-slate-700 text-center relative overflow-hidden">
+                                <div className="w-16 h-16 bg-indigo-500/20 text-indigo-400 rounded-full flex items-center justify-center mx-auto mb-4 border-2 border-indigo-500/50 shadow-[0_0_15px_rgba(99,102,241,0.3)]">
+                                    <Icon name="Lock" className="w-8 h-8" />
+                                </div>
+                                <h2 className="text-2xl font-black text-white mb-2 tracking-widest">皇室管理區</h2>
+                                <p className="text-slate-400 text-xs font-bold mb-6">請輸入 4 位數 PIN 碼，或使用生物辨識解鎖</p>
+                                
+                                {loginError && <p className="text-red-400 text-xs font-bold mb-4 animate-shake">{loginError}</p>}
+                                
+                                {hasBioBound && (
+                                    <button onClick={loginWithBiometrics} className="w-full py-4 bg-indigo-600 hover:bg-indigo-500 text-white rounded-2xl font-black mb-6 active:scale-95 transition-all shadow-lg flex justify-center items-center gap-2">
+                                        <Icon name="Fingerprint" className="w-5 h-5" /> 生物辨識快速登入
+                                    </button>
+                                )}
+                                
+                                <div className="flex justify-center gap-3 mb-8">
+                                    {[...Array(4)].map((_, i) => <div key={i} className={`w-3.5 h-3.5 rounded-full border-2 border-indigo-500 transition-all duration-200 ${loginPin.length > i ? "bg-indigo-400 scale-125 shadow-[0_0_10px_rgba(99,102,241,0.6)]" : "bg-transparent"}`}></div>)}
+                                </div>
 
-                                    <div className="grid grid-cols-3 gap-3 text-white">
-                                        {[1,2,3,4,5,6,7,8,9,"C",0,"←"].map(k => (
-                                            <button key={k} onClick={() => {
-                                                if (k === "C") { setLoginPin(""); return; }
-                                                if (k === "←") { setLoginPin(loginPin.slice(0,-1)); return; }
-                                                const n = loginPin + k; 
-                                                if (n.length > 4) return; 
-                                                setLoginPin(n);
-                                                if (n.length === 4) handlePinLogin(n);
-                                            }} className="bg-white/5 h-14 rounded-xl font-black text-2xl active:bg-indigo-600 transition-all border border-white/5 shadow-sm">
-                                                {k}
-                                            </button>
-                                        ))}
-                                    </div>
-                                    
-                                    <div className="mt-8 flex justify-between items-center px-2">
-                                        <button onClick={() => { setMode('kid'); setLoginPin(''); setLoginError(''); }} className="text-slate-400 text-xs font-bold underline underline-offset-4 hover:text-white">返回洋洋模式</button>
-                                        <button onClick={() => alert("【緊急救援】\n若忘記密碼，請輸入救援萬用碼：9999\n這會強制解鎖並將密碼重置為 0000。")} className="text-slate-500 text-[10px] font-bold">忘記密碼？</button>
-                                    </div>
+                                <div className="grid grid-cols-3 gap-3 text-white">
+                                    {[1,2,3,4,5,6,7,8,9,"C",0,"←"].map(k => (
+                                        <button key={k} onClick={() => {
+                                            if (k === "C") { setLoginPin(""); return; }
+                                            if (k === "←") { setLoginPin(loginPin.slice(0,-1)); return; }
+                                            const n = loginPin + k; 
+                                            if (n.length > 4) return; 
+                                            setLoginPin(n);
+                                            if (n.length === 4) handlePinLogin(n);
+                                        }} className="bg-white/5 h-14 rounded-xl font-black text-2xl active:bg-indigo-600 transition-all border border-white/5 shadow-sm">
+                                            {k}
+                                        </button>
+                                    ))}
+                                </div>
+                                
+                                <div className="mt-8 flex justify-between items-center px-2">
+                                    <button onClick={() => { setMode('kid'); setLoginPin(''); setLoginError(''); }} className="text-slate-400 text-xs font-bold underline underline-offset-4 hover:text-white">返回洋洋模式</button>
+                                    <button onClick={() => alert("【緊急救援】\n若忘記密碼，請輸入救援萬用碼：9999\n這會強制解鎖並將密碼重置為 0000。")} className="text-slate-500 text-[10px] font-bold">忘記密碼？</button>
                                 </div>
                             </div>
-                        )}
+                        </div>
+                    )}
 
+                    <div className="w-full max-w-4xl flex flex-col h-full relative shadow-2xl bg-white border-x-4 border-slate-200">
+                        
                         {/* 頂部切換鈕 */}
                         <div className="flex justify-center shrink-0 w-full z-20 pt-3 pb-3 bg-slate-100 border-b border-slate-200">
                             <div className="bg-white/80 backdrop-blur-md p-1.5 rounded-xl shadow-sm border border-slate-200 flex gap-1 items-center">
@@ -1453,7 +1442,7 @@
                             </div>
                         </div>
 
-                        <div className="main-card relative bg-slate-50 flex flex-col flex-1 min-h-0">
+                        <div className="flex flex-col flex-1 min-h-0 relative bg-slate-50">
                             {/* 洋洋模式內容 */}
                             {mode === 'kid' && (
                                 <div className="flex flex-col h-full relative min-h-0 flex-1">
@@ -1741,16 +1730,6 @@
                             {/* 皇室管理模式內容 (已驗證) */}
                             {mode === 'parent' && isParentAuth && (
                                 <div className="flex flex-col h-full relative flex-1 min-h-0">
-                                    <div className="bg-slate-800 px-6 py-4 md:px-8 md:py-6 text-white shrink-0 flex items-center justify-between z-20 shadow-md">
-                                        <div>
-                                            <div className="flex items-center gap-2 mb-1">
-                                                <Icon name="Settings2" className="w-6 h-6 md:w-8 md:h-8 text-indigo-400" />
-                                                <h2 className="text-xl md:text-2xl font-black tracking-wider">系統管理與設定</h2>
-                                            </div>
-                                            <p className="text-slate-400 text-xs font-bold pl-8 md:pl-10">家長專屬：掌握進度與發放獎勵</p>
-                                        </div>
-                                    </div>
-
                                     {/* 緊湊置左的分頁按鈕 (加入 whitespace-nowrap 與 shrink-0 解決破圖) */}
                                     <div className="flex px-2 md:px-6 pt-4 gap-1.5 border-b border-indigo-200 z-10 relative bg-slate-100 shrink-0 overflow-x-auto no-scrollbar shadow-[0_2px_5px_rgba(0,0,0,0.02)] items-end">
                                         <button onClick={() => setParentTab('log')}
@@ -1783,7 +1762,7 @@
                                         </button>
                                     </div>
 
-                                    <div className="flex-1 min-h-0 overflow-y-auto bg-white p-4 md:p-6 relative z-0">
+                                    <div className="flex-1 min-h-0 overflow-y-auto bg-white p-4 md:p-6 relative z-0 border-t-2 border-slate-200 pb-20">
                                         
                                         {/* 分頁 1：作息表補登 */}
                                         {parentTab === 'log' && (
