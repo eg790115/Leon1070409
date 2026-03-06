@@ -5,12 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>洋洋作息打勾表</title>
     
-    <!-- 強制瀏覽器不快取，解決 GitHub Pages 更新後平板沒跟著更新的問題 -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
     
-    <!-- 解決安卓/小米平板 PWA 全螢幕與安裝問題 -->
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-touch-fullscreen" content="yes">
@@ -49,11 +47,11 @@
         /* 鎖定螢幕與防呆 */
         body, html {
             margin: 0; padding: 0; height: 100%; width: 100%;
-            overflow: hidden; background-color: #f1f5f9;
+            overflow: hidden; background-color: #e2e8f0; 
             user-select: none; -webkit-tap-highlight-color: transparent;
             overscroll-behavior: none;
         }
-        #root { height: 100%; }
+        #root { height: 100%; width: 100%; } 
         .no-scrollbar::-webkit-scrollbar { display: none; }
         .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
         
@@ -64,22 +62,13 @@
         @keyframes confetti-fall { 0% { transform: translateY(-10vh) rotate(0deg); opacity: 1; } 100% { transform: translateY(110vh) rotate(720deg); opacity: 0; } }
         .animate-confetti-fall { animation: confetti-fall linear infinite; will-change: transform, opacity; }
 
-        /* 全螢幕雙層光芒特效 (減半細緻版) */
-        .sunburst-layer-1 {
-            background: repeating-conic-gradient(from 0deg, #FDE047 0deg 4deg, transparent 4deg 40deg);
-            border-radius: 50%;
-            animation: spin-rays 35s linear infinite;
-        }
-        .sunburst-layer-2 {
-            background: repeating-conic-gradient(from 10deg, rgba(255,255,255,0.7) 0deg 3deg, transparent 3deg 45deg);
-            border-radius: 50%;
-            animation: spin-rays 20s linear infinite;
-        }
+        /* 全螢幕雙層光芒特效 */
+        .sunburst-layer-1 { background: repeating-conic-gradient(from 0deg, #FDE047 0deg 4deg, transparent 4deg 40deg); border-radius: 50%; animation: spin-rays 35s linear infinite; }
+        .sunburst-layer-2 { background: repeating-conic-gradient(from 10deg, rgba(255,255,255,0.7) 0deg 3deg, transparent 3deg 45deg); border-radius: 50%; animation: spin-rays 20s linear infinite; }
         @keyframes spin-rays { 100% { transform: rotate(360deg); } }
         
-        .app-container { height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
-        .main-card { flex: 1; display: flex; flex-direction: column; min-height: 0; }
-        .scrollable-area { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+        /* 完美的彈性置中框架 */
+        .app-container { height: 100vh; display: flex; flex-direction: column; overflow: hidden; width: 100%; align-items: center; }
         
         .touch-none { touch-action: none; }
 
@@ -105,13 +94,16 @@
 
         @keyframes slide-down-fade { from { opacity: 0; transform: translateY(-10px) scale(0.98); } to { opacity: 1; transform: translateY(0) scale(1); } }
         .animate-slide-down { animation: slide-down-fade 0.3s cubic-bezier(0.2, 1, 0.2, 1) forwards; }
+
+        @keyframes shake-error { 0%, 100% { transform: translateX(0); } 20% { transform: translateX(-10px); } 40% { transform: translateX(10px); } 60% { transform: translateX(-10px); } 80% { transform: translateX(10px); } }
+        .animate-shake { animation: shake-error 0.5s ease-in-out; }
     </style>
 </head>
 <body>
     <div id="root"></div>
 
     <script type="text/babel">
-        const { useState, useEffect, useMemo, useRef, useCallback } = React;
+        const { useState, useEffect, useMemo, useRef, useCallback, Fragment } = React; 
 
         const ICONS_DATA = {
             Calendar: <path d="M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z" />,
@@ -127,14 +119,22 @@
             ChevronRight: <path d="m9 18 6-6-6-6" />,
             Gift: <path d="M20 12v10H4V12M2 7h20v5H2zM12 22V7M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7zM12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z" />,
             Edit2: <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z" />,
-            AlertTriangle: <><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z" /><path d="M12 9v4" /><path d="M12 17h.01" /></>
+            AlertTriangle: <Fragment><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z" /><path d="M12 9v4" /><path d="M12 17h.01" /></Fragment>, 
+            Award: <Fragment><circle cx="12" cy="8" r="6"/><path d="M15.477 12.89 17 22l-5-3-5 3 1.523-9.11"/></Fragment>, 
+            Camera: <Fragment><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/></Fragment>, 
+            Loader: <path d="M21 12a9 9 0 1 1-6.219-8.56" />,
+            ListTodo: <Fragment><rect x="3" y="5" width="6" height="6" rx="1"/><path d="m3 17 2 2 4-4"/><path d="M13 6h8"/><path d="M13 12h8"/><path d="M13 18h8"/></Fragment>,
+            Lock: <Fragment><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></Fragment>,
+            Fingerprint: <Fragment><path d="M2 12C2 6.48 6.48 2 12 2s10 4.48 10 10"/><path d="M5 15.5C3.12 13.9 2 11.58 2 9c0-5.52 4.48-10 10-10s10 4.48 10 10c0 2.58-1.12 4.9-2.99 6.5"/><path d="M8.5 19C6.38 17.5 5 15.14 5 12.5c0-3.87 3.13-7 7-7s7 3.13 7 7c0 2.64-1.38 5-3.5 6.5"/><path d="M12 22v-4"/><path d="M12 14v-2"/><path d="M15.5 19c1.62-1.5 2.5-3.64 2.5-6 0-2.21-1.79-4-4-4s-4 1.79-4 4c0 2.36.88 4.5 2.5 6"/></Fragment>,
+            Download: <Fragment><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></Fragment>,
+            Upload: <Fragment><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></Fragment>
         };
 
-        const Icon = ({ name, className = "w-6 h-6", style = {}, strokeWidth = 2.5 }) => {
+        function Icon({ name, className = "w-6 h-6", style = {}, strokeWidth = 2.5 }) {
             return <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" className={className} style={style}>{ICONS_DATA[name]}</svg>;
-        };
+        }
 
-        const MagicSparkles = () => {
+        function MagicSparkles() {
             return (
                 <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-[100]">
                     {[...Array(8)].map((_, i) => {
@@ -149,19 +149,21 @@
                     })}
                 </div>
             );
-        };
+        }
 
-        const CustomNewTrophy = ({ color }) => (
-            <svg viewBox="0 0 100 100" fill="none" stroke={color} xmlns="http://www.w3.org/2000/svg" className="w-16 h-16 sm:w-20 sm:h-20 md:w-24 md:h-24 trophy-glow animate-bounce-fast" style={{ filter: `drop-shadow(0 0 10px ${color})` }}>
-                <path d="M20 30 H10 v10 a10 10 0 0 0 10 10 M80 30 H90 v10 a10 10 0 0 1 -10 10" strokeWidth="8" strokeLinecap="round" strokeLinejoin="round"/>
-                <path d="M20 20 H80 V40 A 30 30 0 0 1 20 40 Z" fill={color} fillOpacity="0.2" strokeWidth="8" strokeLinejoin="round"/>
-                <path d="M45 70 H55 V85 H45 Z" fill={color} fillOpacity="0.2" strokeWidth="8" strokeLinejoin="round"/>
-                <path d="M30 85 H70 V95 H30 Z" fill={color} fillOpacity="0.2" strokeWidth="8" strokeLinejoin="round"/>
-                <path d="M50 28 L52.5 36 H61 L54 41 L56.5 50 L50 44.5 L43.5 50 L46 41 L39 36 H47.5 Z" fill={color} stroke="none"/>
-            </svg>
-        );
+        function CustomNewTrophy({ color }) {
+            return (
+                <svg viewBox="0 0 100 100" fill="none" stroke={color} xmlns="http://www.w3.org/2000/svg" className="w-16 h-16 sm:w-20 sm:h-20 md:w-24 md:h-24 trophy-glow animate-bounce-fast" style={{ filter: `drop-shadow(0 0 10px ${color})` }}>
+                    <path d="M20 30 H10 v10 a10 10 0 0 0 10 10 M80 30 H90 v10 a10 10 0 0 1 -10 10" strokeWidth="8" strokeLinecap="round" strokeLinejoin="round"/>
+                    <path d="M20 20 H80 V40 A 30 30 0 0 1 20 40 Z" fill={color} fillOpacity="0.2" strokeWidth="8" strokeLinejoin="round"/>
+                    <path d="M45 70 H55 V85 H45 Z" fill={color} fillOpacity="0.2" strokeWidth="8" strokeLinejoin="round"/>
+                    <path d="M30 85 H70 V95 H30 Z" fill={color} fillOpacity="0.2" strokeWidth="8" strokeLinejoin="round"/>
+                    <path d="M50 28 L52.5 36 H61 L54 41 L56.5 50 L50 44.5 L43.5 50 L46 41 L39 36 H47.5 Z" fill={color} stroke="none"/>
+                </svg>
+            );
+        }
 
-        const RoyalRays = () => {
+        function RoyalRays() {
             return (
                 <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[250vmax] h-[250vmax] pointer-events-none z-[-1] opacity-75"
                      style={{ maskImage: 'radial-gradient(circle, transparent 5%, black 15%)', WebkitMaskImage: 'radial-gradient(circle, transparent 5%, black 15%)' }}>
@@ -169,7 +171,7 @@
                     <div className="absolute inset-0 sunburst-layer-2" />
                 </div>
             );
-        };
+        }
 
         const defaultTasks = [
             { id: '1', cat: '每天', title: '聽英文', rule: [1, 3, 4, 6] },
@@ -193,18 +195,33 @@
             { id: '19', cat: '週末', title: '喝小安素', rule: [6, 7] }
         ];
 
-        const DB_NAME = 'YangYangRoyal_V66';
+        // 徹底放棄帶有版號的 DB 名稱，確保 PWA 更新後資料永遠不流失
+        const DB_NAME = 'YangYangRoyal_PROD'; 
         const STORE_NAME = 'ChecklistData';
         
         const getYYYYMMDD = (date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 
+        // 徹底放棄帶有版號的 Keys，避免更新後空空如也
         const STORAGE_KEYS = {
-            TASKS: 'yang_v66_tasks',
-            TASKS_BAK: 'yang_v66_tasks_bak',
-            PROGRESS: (dateStr) => `yang_v66_checked_${dateStr}`,
-            PROGRESS_BAK: (dateStr) => `yang_v66_checked_${dateStr}_bak`,
-            COMPLETED_DATES: 'yang_v66_completed_dates',
-            REWARDS: 'yang_v66_rewards' 
+            TASKS: 'yang_data_tasks', TASKS_BAK: 'yang_data_tasks_bak',
+            PROGRESS: (dateStr) => `yang_data_checked_${dateStr}`, PROGRESS_BAK: (dateStr) => `yang_data_checked_${dateStr}_bak`,
+            COMPLETED_DATES: 'yang_data_completed_dates',
+            REWARDS: 'yang_data_rewards',
+            EXAMS: 'yang_data_exams',
+            EXAM_SUBJECTS: 'yang_data_exam_subjects',
+            EXAM_TYPES: 'yang_data_exam_types',
+            EXAM_UNITS: 'yang_data_exam_units',
+            EVENTS: 'yang_data_events',
+            EXAM_RULES: 'yang_data_exam_rules',
+            PARENT_PIN: 'yang_data_parent_pin',
+            PARENT_BIO: 'yang_data_parent_bio_id'
+        };
+
+        const EVENT_TYPES = {
+            'school': { label: '學校', color: 'bg-blue-100 text-blue-700 border-blue-200' },
+            'aftercare': { label: '安親班', color: 'bg-emerald-100 text-emerald-700 border-emerald-200' },
+            'gloria': { label: '葛洛莉', color: 'bg-purple-100 text-purple-700 border-purple-200' },
+            'leave': { label: '請假', color: 'bg-red-100 text-red-700 border-red-200' }
         };
 
         const openDB = () => {
@@ -232,6 +249,7 @@
         };
 
         const saveTimeouts = {}; 
+        
         const robustSave = (key, backupKey, data) => {
             const json = JSON.stringify(data);
             try { localStorage.setItem(key, json); localStorage.setItem(backupKey, json); } catch (e) {}
@@ -240,14 +258,23 @@
         };
 
         const robustLoad = async (key, backupKey, defaultValue) => {
-            const idbData = await idbLoad(key);
-            if (idbData) return idbData;
+            // 自動向下相容 V92 的資料 (無縫轉移)
+            const legacyKey = key.replace('yang_data_', 'yang_v92_');
             try {
-                const primary = localStorage.getItem(key);
+                let primary = localStorage.getItem(key);
+                if (!primary) primary = localStorage.getItem(legacyKey);
                 if (primary) return JSON.parse(primary);
-                const backup = localStorage.getItem(backupKey);
+                
+                let backup = localStorage.getItem(backupKey);
+                if (!backup && backupKey) backup = localStorage.getItem(backupKey.replace('yang_data_', 'yang_v92_'));
                 if (backup) return JSON.parse(backup);
             } catch (e) {}
+            
+            const idbData = await idbLoad(key);
+            if (idbData) return idbData;
+            const legacyIdbData = await idbLoad(legacyKey);
+            if (legacyIdbData) return legacyIdbData;
+            
             return defaultValue;
         };
 
@@ -322,9 +349,22 @@
             return tasksForDay.length === 0;
         };
 
+        const delay = (ms) => new Promise(res => setTimeout(res, ms));
+
         const App = () => {
             const [mode, setMode] = useState('kid'); 
+            const [kidTab, setKidTab] = useState('tasks'); 
             const [parentTab, setParentTab] = useState('log'); 
+            
+            // 家長安全鎖狀態
+            const [isParentAuth, setIsParentAuth] = useState(false);
+            const [loginPin, setLoginPin] = useState('');
+            const [loginError, setLoginError] = useState('');
+            
+            // 安全設定狀態
+            const [showSecurityModal, setShowSecurityModal] = useState(false);
+            const [newPin, setNewPin] = useState('');
+            const [hasBioBound, setHasBioBound] = useState(false);
 
             const [realToday] = useState(new Date());
             const realDayOfWeek = useMemo(() => realToday.getDay() || 7, [realToday]);
@@ -345,19 +385,59 @@
             const activeDateStr = useMemo(() => daysWithDates.find(d => d.id === selectedDay)?.fullDateStr, [selectedDay, daysWithDates]);
             const isFutureDate = useMemo(() => activeDateStr > getYYYYMMDD(realToday), [activeDateStr, realToday]);
 
+            const [examMonthOffset, setExamMonthOffset] = useState(0);
+            const [selectedExamDateStr, setSelectedExamDateStr] = useState(getYYYYMMDD(realToday));
+
             const [checkedItems, setCheckedItems] = useState({});
             const [sortingCheckedItems, setSortingCheckedItems] = useState({});
             const [completedDates, setCompletedDates] = useState([]); 
             const [allTasks, setAllTasks] = useState(defaultTasks);
             
+            const [exams, setExams] = useState([]);
+            const [examSubjects, setExamSubjects] = useState(['國語', '數學', '英文', '社會', '自然']);
+            const [examTypes, setExamTypes] = useState(['平時考', '期中考', '期末考', '複習考']);
+            const [examUnits, setExamUnits] = useState(['單元', '課', '章', '回']);
+            
+            const [newSubjectInput, setNewSubjectInput] = useState('');
+            const [newTypeInput, setNewTypeInput] = useState('');
+            const [newUnitInput, setNewUnitInput] = useState('');
+            
+            const [showExamModal, setShowExamModal] = useState(false);
+            const [examDate, setExamDate] = useState('');
+            const [examSubject, setExamSubject] = useState('');
+            const [examType, setExamType] = useState('平時考');
+            const [examUnitPrefix, setExamUnitPrefix] = useState('單元');
+            const [examUnitNumber, setExamUnitNumber] = useState('');
+            const [examScore, setExamScore] = useState('');
+
+            const [editingExamId, setEditingExamId] = useState(null);
+            const [editExamDate, setEditExamDate] = useState('');
+            const [editExamSubject, setEditExamSubject] = useState('');
+            const [editExamType, setEditExamType] = useState('');
+            const [editExamUnit, setEditExamUnit] = useState(''); // Parent uses simple text input
+            const [editExamScore, setEditExamScore] = useState('');
+            
+            const [examRules, setExamRules] = useState([]);
+            const [newRuleType, setNewRuleType] = useState('不限');
+            const [newRuleSubject, setNewRuleSubject] = useState('不限');
+            const [newRuleScore, setNewRuleScore] = useState('');
+            const [newRuleCount, setNewRuleCount] = useState('');
+            const [newRuleRewardName, setNewRuleRewardName] = useState('');
+            
+            const [events, setEvents] = useState([]);
+            const [calendarMonthOffset, setCalendarMonthOffset] = useState(0);
+            const [showEventModal, setShowEventModal] = useState(false);
+            const [selectedEventDate, setSelectedEventDate] = useState(getYYYYMMDD(realToday));
+            const [newEventTitle, setNewEventTitle] = useState('');
+            const [newEventType, setNewEventType] = useState('school');
+            const [isAnalyzingPhoto, setIsAnalyzingPhoto] = useState(false); 
+            const photoInputRef = useRef(null);
+
             const [rewards, setRewards] = useState([]);
             const [pendingRewardsInputs, setPendingRewardsInputs] = useState({});
-            
             const [editingRewardId, setEditingRewardId] = useState(null);
             const [editRewardTitle, setEditRewardTitle] = useState('');
             
-            const [syncTrigger, setSyncTrigger] = useState(0);
-
             const [celebratingCards, setCelebratingCards] = useState({}); 
             const [teleportingCards, setTeleportingCards] = useState({}); 
             const [showCelebration, setShowCelebration] = useState(false);
@@ -365,7 +445,6 @@
 
             const [deleteConfirmId, setDeleteConfirmId] = useState(null);
             const [parentMonthOffset, setParentMonthOffset] = useState(0); 
-            
             const [selectedLogDateStr, setSelectedLogDateStr] = useState(null);
             const [animatingLogTasks, setAnimatingLogTasks] = useState({});
 
@@ -374,6 +453,11 @@
             const logListRef = useRef(null);
             const completionTimeouts = useRef({});
             const sortableInstanceRef = useRef(null);
+            
+            const isAnimatingRef = useRef(false);
+            const fileInputRef = useRef(null);
+
+            const [syncTrigger, setSyncTrigger] = useState(0);
 
             const touchStartX = useRef(null);
             const touchEndX = useRef(null);
@@ -383,7 +467,7 @@
             const handleTouchEnd = () => {
                 if (!touchStartX.current || !touchEndX.current) return;
                 const distance = touchStartX.current - touchEndX.current;
-                if (mode === 'kid') {
+                if (mode === 'kid' && (kidTab === 'tasks' || kidTab === 'exams')) {
                     if (distance > 50 && selectedDay < 7) setSelectedDay(selectedDay + 1);
                     else if (distance < -50 && selectedDay > 1) setSelectedDay(selectedDay - 1);
                 }
@@ -392,33 +476,26 @@
             };
 
             useEffect(() => {
-                const interval = setInterval(() => {
-                    if (kidListRef.current && window.autoAnimate && mode === 'kid') {
-                        if (!kidListRef.current.hasAttribute('data-aa')) {
-                            window.autoAnimate(kidListRef.current, { duration: 350, easing: 'ease-in-out' });
-                            kidListRef.current.setAttribute('data-aa', 'true');
-                        }
+                if (kidListRef.current && window.autoAnimate) {
+                    if (!kidListRef.current.hasAttribute('data-aa')) {
+                        window.autoAnimate(kidListRef.current, { duration: 350, easing: 'ease-in-out' });
+                        kidListRef.current.setAttribute('data-aa', 'true');
                     }
-                    if (logListRef.current && window.autoAnimate && mode === 'parent') {
-                        if (!logListRef.current.hasAttribute('data-aa')) {
-                            window.autoAnimate(logListRef.current, { duration: 300, easing: 'ease-in-out' });
-                            logListRef.current.setAttribute('data-aa', 'true');
-                        }
+                }
+                if (logListRef.current && window.autoAnimate) {
+                    if (!logListRef.current.hasAttribute('data-aa')) {
+                        window.autoAnimate(logListRef.current, { duration: 300, easing: 'ease-in-out' });
+                        logListRef.current.setAttribute('data-aa', 'true');
                     }
-                }, 150); 
-                return () => clearInterval(interval);
-            }); 
+                }
+            }, [mode, kidTab, parentTab, selectedLogDateStr, isParentAuth]);
 
             useEffect(() => {
-                if (mode === 'parent' && parentTab === 'manage' && manageListRef.current && window.Sortable) {
+                if (mode === 'parent' && isParentAuth && parentTab === 'manage' && manageListRef.current && window.Sortable) {
                     if (!sortableInstanceRef.current) {
                         sortableInstanceRef.current = new window.Sortable(manageListRef.current, {
-                            animation: 250, 
-                            handle: '.drag-handle',
-                            ghostClass: 'sortable-ghost',
-                            dragClass: 'sortable-drag',
-                            forceFallback: true, 
-                            fallbackTolerance: 3, 
+                            animation: 250, handle: '.drag-handle', ghostClass: 'sortable-ghost', dragClass: 'sortable-drag',
+                            forceFallback: true, fallbackTolerance: 3, 
                             onEnd: (evt) => {
                                 const { oldIndex, newIndex, item } = evt;
                                 if (oldIndex !== newIndex && oldIndex !== undefined && newIndex !== undefined) {
@@ -437,28 +514,40 @@
                         });
                     }
                 } else {
-                    if (sortableInstanceRef.current) {
-                        sortableInstanceRef.current.destroy();
-                        sortableInstanceRef.current = null;
-                    }
+                    if (sortableInstanceRef.current) { sortableInstanceRef.current.destroy(); sortableInstanceRef.current = null; }
                 }
             });
 
+            // 初始化載入
             useEffect(() => {
                 const initData = async () => {
                     const tasks = await robustLoad(STORAGE_KEYS.TASKS, STORAGE_KEYS.TASKS_BAK, defaultTasks);
-                    if (Array.isArray(tasks) && tasks.length > 0) setAllTasks(tasks);
-                    else { setAllTasks(defaultTasks); robustSave(STORAGE_KEYS.TASKS, STORAGE_KEYS.TASKS_BAK, defaultTasks); }
-                    
+                    setAllTasks(Array.isArray(tasks) && tasks.length > 0 ? tasks : defaultTasks);
                     const dates = await robustLoad(STORAGE_KEYS.COMPLETED_DATES, STORAGE_KEYS.COMPLETED_DATES + '_bak', []);
                     setCompletedDates(dates);
-                    
                     const rewardsData = await robustLoad(STORAGE_KEYS.REWARDS, STORAGE_KEYS.REWARDS + '_bak', []);
                     setRewards(rewardsData);
+                    const examsData = await robustLoad(STORAGE_KEYS.EXAMS, STORAGE_KEYS.EXAMS + '_bak', []);
+                    setExams(examsData);
+                    const subjectsData = await robustLoad(STORAGE_KEYS.EXAM_SUBJECTS, STORAGE_KEYS.EXAM_SUBJECTS + '_bak', ['國語', '數學', '英文', '社會', '自然']);
+                    setExamSubjects(subjectsData);
+                    const typesData = await robustLoad(STORAGE_KEYS.EXAM_TYPES, STORAGE_KEYS.EXAM_TYPES + '_bak', ['平時考', '期中考', '期末考', '複習考']);
+                    setExamTypes(typesData);
+                    const unitsData = await robustLoad(STORAGE_KEYS.EXAM_UNITS, STORAGE_KEYS.EXAM_UNITS + '_bak', ['單元', '課', '章', '回']);
+                    setExamUnits(unitsData);
+                    const eventsData = await robustLoad(STORAGE_KEYS.EVENTS, STORAGE_KEYS.EVENTS + '_bak', []);
+                    setEvents(eventsData);
+                    const rulesData = await robustLoad(STORAGE_KEYS.EXAM_RULES, STORAGE_KEYS.EXAM_RULES + '_bak', []);
+                    setExamRules(rulesData);
+                    
+                    const savedPin = localStorage.getItem(STORAGE_KEYS.PARENT_PIN);
+                    if (!savedPin) localStorage.setItem(STORAGE_KEYS.PARENT_PIN, '0000');
+                    setHasBioBound(!!localStorage.getItem(STORAGE_KEYS.PARENT_BIO));
                 };
                 initData();
             }, []);
 
+            // 日期切換時載入資料
             useEffect(() => {
                 if (!activeDateStr) return;
                 let isMounted = true;
@@ -474,11 +563,7 @@
                     }
                 };
                 initProgress();
-                return () => {
-                    isMounted = false;
-                    Object.values(completionTimeouts.current).forEach(clearTimeout);
-                    completionTimeouts.current = {};
-                };
+                return () => { isMounted = false; };
             }, [activeDateStr]); 
 
             const checkAndUpdateCompletion = (dateStr, dow, currentChecked) => {
@@ -513,20 +598,6 @@
             const completedCount = currentTasks.filter(t => checkedItems[t.id]).length;
             const progress = currentTasks.length ? Math.round((completedCount / currentTasks.length) * 100) : 0;
 
-            useEffect(() => {
-                if (isLoadingProgress) return;
-                
-                if (progress === 100 && currentTasks.length > 0 && mode === 'kid' && selectedDay === realDayOfWeek) {
-                    setShowCelebration(true);
-                } else {
-                    setShowCelebration(false);
-                }
-
-                if (activeDateStr) {
-                    checkAndUpdateCompletion(activeDateStr, selectedDay, checkedItems);
-                }
-            }, [progress, mode, currentTasks.length, selectedDay, realDayOfWeek, isLoadingProgress, activeDateStr, checkedItems]);
-
             const currentStreak = useMemo(() => {
                 const checkIsCompleted = (dateObj) => {
                     const dateStr = getYYYYMMDD(dateObj);
@@ -536,26 +607,10 @@
                     return false;
                 };
 
-                let streak = 0;
-                let checkDate = new Date(realToday);
-                
-                if (checkIsCompleted(checkDate)) {
-                    streak++;
-                    checkDate.setDate(checkDate.getDate() - 1);
-                } else {
-                    checkDate.setDate(checkDate.getDate() - 1);
-                    if (checkIsCompleted(checkDate)) {
-                        streak++;
-                        checkDate.setDate(checkDate.getDate() - 1);
-                    } else { return 0; }
-                }
-
-                while (true) {
-                    if (checkIsCompleted(checkDate)) {
-                        streak++;
-                        checkDate.setDate(checkDate.getDate() - 1);
-                    } else { break; }
-                }
+                let streak = 0; let checkDate = new Date(realToday);
+                if (checkIsCompleted(checkDate)) { streak++; checkDate.setDate(checkDate.getDate() - 1); }
+                else { checkDate.setDate(checkDate.getDate() - 1); if (checkIsCompleted(checkDate)) { streak++; checkDate.setDate(checkDate.getDate() - 1); } else { return 0; } }
+                while (true) { if (checkIsCompleted(checkDate)) { streak++; checkDate.setDate(checkDate.getDate() - 1); } else { break; } }
                 return streak;
             }, [completedDates, realToday, allTasks]);
 
@@ -566,25 +621,149 @@
                 let count = 0;
                 const completedSet = new Set(completedDates);
                 for(let i=0; i<7; i++) {
-                    const cur = new Date(mon);
-                    cur.setDate(cur.getDate() + i);
+                    const cur = new Date(mon); cur.setDate(cur.getDate() + i);
                     if (isDayActuallyCompleted(getYYYYMMDD(cur), completedSet, allTasks)) count++;
                 }
                 return count;
             }, [realToday, completedDates, allTasks]);
 
             const currentMonthProgress = useMemo(() => {
-                const y = realToday.getFullYear();
-                const m = realToday.getMonth() + 1;
+                const y = realToday.getFullYear(); const m = realToday.getMonth() + 1;
                 const daysInMonth = new Date(y, m, 0).getDate();
-                let count = 0;
-                const completedSet = new Set(completedDates);
+                let count = 0; const completedSet = new Set(completedDates);
                 for(let i=1; i<=daysInMonth; i++) {
                     const cur = `${y}-${String(m).padStart(2,'0')}-${String(i).padStart(2,'0')}`;
                     if (isDayActuallyCompleted(cur, completedSet, allTasks)) count++;
                 }
                 return { count, total: daysInMonth };
             }, [realToday, completedDates, allTasks]);
+
+            // 家長安全登入邏輯
+            const handlePinLogin = (pin) => {
+                if (pin === '9999') {
+                    localStorage.setItem(STORAGE_KEYS.PARENT_PIN, '0000');
+                    setIsParentAuth(true);
+                    setLoginPin('');
+                    setLoginError('');
+                    alert("✅ 已使用緊急萬用碼登入！\n您的管理密碼已被重置為預設的「0000」。\n請至「系統安全設定」重新修改密碼。");
+                    return;
+                }
+                const correctPin = localStorage.getItem(STORAGE_KEYS.PARENT_PIN) || '0000';
+                if (pin === correctPin) {
+                    setIsParentAuth(true);
+                    setLoginPin('');
+                    setLoginError('');
+                } else {
+                    setLoginError('密碼錯誤！');
+                    setLoginPin('');
+                    setTimeout(() => setLoginError(''), 1000);
+                }
+            };
+
+            const bindBiometrics = async () => {
+                if (!window.PublicKeyCredential) { alert("此裝置不支援生物辨識"); return; }
+                try {
+                    const challenge = new Uint8Array(32); window.crypto.getRandomValues(challenge);
+                    const userID = new Uint8Array(16); window.crypto.getRandomValues(userID);
+                    const cred = await navigator.credentials.create({
+                        publicKey: {
+                            challenge, rp: { name: "洋洋作息表" }, user: { id: userID, name: "Parent", displayName: "家長" },
+                            pubKeyCredParams: [{ type: "public-key", alg: -7 }, { type: "public-key", alg: -257 }],
+                            authenticatorSelection: { authenticatorAttachment: "platform", userVerification: "required" },
+                            timeout: 60000
+                        }
+                    });
+                    localStorage.setItem(STORAGE_KEYS.PARENT_BIO, btoa(String.fromCharCode.apply(null, new Uint8Array(cred.rawId))));
+                    setHasBioBound(true);
+                    alert("✅ 生物辨識綁定成功！");
+                } catch (e) { alert("綁定失敗或被取消"); }
+            };
+
+            const loginWithBiometrics = async () => {
+                const base64Id = localStorage.getItem(STORAGE_KEYS.PARENT_BIO);
+                if (!base64Id) return;
+                try {
+                    const idStr = atob(base64Id);
+                    const idArray = new Uint8Array(idStr.length);
+                    for (let i=0; i<idStr.length; i++) idArray[i] = idStr.charCodeAt(i);
+                    const challenge = new Uint8Array(32); window.crypto.getRandomValues(challenge);
+                    
+                    await navigator.credentials.get({
+                        publicKey: { challenge, allowCredentials: [{ type: "public-key", id: idArray }], userVerification: "required" }
+                    });
+                    setIsParentAuth(true);
+                    setLoginError('');
+                } catch (e) { setLoginError('辨識失敗'); setTimeout(() => setLoginError(''), 1000); }
+            };
+
+            // 資料匯出與匯入
+            const handleExportData = () => {
+                const exportObj = {};
+                for (let i = 0; i < localStorage.length; i++) {
+                    const key = localStorage.key(i);
+                    if (key.startsWith('yang_data_')) {
+                        exportObj[key] = localStorage.getItem(key);
+                    }
+                }
+                const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(exportObj));
+                const dlAnchorElem = document.createElement('a');
+                dlAnchorElem.setAttribute("href", dataStr);
+                dlAnchorElem.setAttribute("download", `洋洋作息表備份_${getYYYYMMDD(realToday)}.json`);
+                dlAnchorElem.click();
+            };
+
+            const handleImportData = (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    try {
+                        const importedData = JSON.parse(event.target.result);
+                        Object.keys(importedData).forEach(key => {
+                            if (key.startsWith('yang_data_')) {
+                                localStorage.setItem(key, importedData[key]);
+                            }
+                        });
+                        alert('✅ 資料還原成功！系統將重新載入。');
+                        window.location.reload();
+                    } catch (err) {
+                        alert('❌ 備份檔解析失敗，請確認檔案正確。');
+                    }
+                };
+                reader.readAsText(file);
+            };
+
+            const isPeriodFullyCompleted = useCallback((periodId) => {
+                const completedSet = new Set(completedDates);
+                if (periodId.startsWith('W-')) {
+                    const dateStr = periodId.substring(2); const start = new Date(dateStr);
+                    for(let i=0; i<7; i++) {
+                        const cur = new Date(start); cur.setDate(cur.getDate() + i);
+                        if (!isDayActuallyCompleted(getYYYYMMDD(cur), completedSet, allTasks)) return false;
+                    }
+                    return true;
+                } else if (periodId.startsWith('M-')) {
+                    const parts = periodId.substring(2).split('-'); const y = parseInt(parts[0], 10); const m = parseInt(parts[1], 10);
+                    const daysInMonth = new Date(y, m, 0).getDate();
+                    for(let i=1; i<=daysInMonth; i++) {
+                        const cur = `${y}-${String(m).padStart(2,'0')}-${String(i).padStart(2,'0')}`;
+                        if (!isDayActuallyCompleted(cur, completedSet, allTasks)) return false;
+                    }
+                    return true;
+                } else if (periodId.startsWith('EXAM-')) {
+                    const ruleId = periodId.substring(5).split('-')[0];
+                    const rule = examRules.find(r => r.id === ruleId);
+                    if (!rule) return false; 
+                    const validExams = exams.filter(e => {
+                        const matchType = rule.type === '不限' || e.type === rule.type;
+                        const matchSubj = rule.subject === '不限' || e.subject === rule.subject;
+                        return matchType && matchSubj && e.score >= rule.minScore;
+                    });
+                    const claimCountForRule = rewards.filter(r => r.ruleId === rule.id).length;
+                    return validExams.length >= claimCountForRule * rule.requiredCount;
+                }
+                return true;
+            }, [completedDates, allTasks, examRules, exams, rewards]);
 
             const unclaimedRewards = useMemo(() => {
                 const completedSet = new Set(completedDates);
@@ -595,26 +774,18 @@
                 startOfWeek.setDate(startOfWeek.getDate() - day + 1);
 
                 for (let w = 0; w < 8; w++) {
-                    const mon = new Date(startOfWeek);
-                    mon.setDate(mon.getDate() - w * 7);
+                    const mon = new Date(startOfWeek); mon.setDate(mon.getDate() - w * 7);
                     const wId = `W-${getYYYYMMDD(mon)}`;
                     if (rewards.some(r => r.periodId === wId)) continue; 
 
                     let isFull = true;
                     for(let i=0; i<7; i++) {
-                        const cur = new Date(mon);
-                        cur.setDate(cur.getDate() + i);
-                        if (!isDayActuallyCompleted(getYYYYMMDD(cur), completedSet, allTasks)) {
-                            isFull = false; break;
-                        }
+                        const cur = new Date(mon); cur.setDate(cur.getDate() + i);
+                        if (!isDayActuallyCompleted(getYYYYMMDD(cur), completedSet, allTasks)) { isFull = false; break; }
                     }
                     if (isFull) {
                         const end = new Date(mon); end.setDate(end.getDate() + 6);
-                        available.push({
-                            periodId: wId,
-                            type: 'weekly',
-                            label: `${getWeekLabel(getYYYYMMDD(mon))} 達成 (${mon.getMonth()+1}/${mon.getDate()}~${end.getMonth()+1}/${end.getDate()})`
-                        });
+                        available.push({ periodId: wId, type: 'weekly', label: `${getWeekLabel(getYYYYMMDD(mon))} 達成 (${mon.getMonth()+1}/${mon.getDate()}~${end.getMonth()+1}/${end.getDate()})` });
                     }
                 }
 
@@ -628,21 +799,37 @@
                     let isFull = true;
                     for(let i=1; i<=daysInMonth; i++) {
                         const cur = `${curMonth.getFullYear()}-${String(curMonth.getMonth()+1).padStart(2,'0')}-${String(i).padStart(2,'0')}`;
-                        if (!isDayActuallyCompleted(cur, completedSet, allTasks)) {
-                            isFull = false; break;
-                        }
+                        if (!isDayActuallyCompleted(cur, completedSet, allTasks)) { isFull = false; break; }
                     }
-                    if (isFull) {
+                    if (isFull) available.push({ periodId: mId, type: 'monthly', label: `${curMonth.getMonth()+1}月份 全月達成` });
+                }
+
+                examRules.forEach(rule => {
+                    const validExams = exams.filter(e => {
+                        const matchType = rule.type === '不限' || e.type === rule.type;
+                        const matchSubj = rule.subject === '不限' || e.subject === rule.subject;
+                        const matchScore = e.score >= rule.minScore;
+                        return matchType && matchSubj && matchScore;
+                    });
+                    const possibleClaims = Math.floor(validExams.length / rule.requiredCount);
+                    const claimedCount = rewards.filter(r => r.ruleId === rule.id).length;
+                    
+                    if (possibleClaims > claimedCount) {
                         available.push({
-                            periodId: mId,
-                            type: 'monthly',
-                            label: `${curMonth.getMonth()+1}月份 全月達成`
+                            periodId: `EXAM-${rule.id}`, 
+                            ruleId: rule.id, 
+                            type: 'exam',
+                            count: possibleClaims - claimedCount,
+                            label: `考試達標: ${rule.type === '不限' ? '' : rule.type}${rule.subject === '不限' ? '各科' : rule.subject} ${rule.minScore}分滿${rule.requiredCount}次`,
+                            defaultRewardName: rule.rewardName
                         });
                     }
-                }
-                return available.sort((a,b) => b.periodId.localeCompare(a.periodId)); 
-            }, [completedDates, allTasks, rewards, realToday]);
+                });
 
+                return available.sort((a,b) => b.periodId.localeCompare(a.periodId)); 
+            }, [completedDates, allTasks, rewards, realToday, examRules, exams]);
+
+            // 【關鍵修復】：加入了 syncTrigger 依賴，確保補登後月曆100%瞬間更新
             const parentCalendarData = useMemo(() => {
                 const base = new Date(realToday);
                 base.setMonth(base.getMonth() + parentMonthOffset);
@@ -660,118 +847,202 @@
                     const dow = d.getDay() || 7;
                     const dayTasks = allTasks.filter(t => t.rule.includes(dow));
                     
-                    const raw = localStorage.getItem(STORAGE_KEYS.PROGRESS(dateStr)) || localStorage.getItem(STORAGE_KEYS.PROGRESS_BAK(dateStr));
-                    const checked = raw ? JSON.parse(raw) : {};
+                    let checked = {};
+                    if (dateStr === activeDateStr) {
+                        checked = checkedItems; 
+                    } else {
+                        const raw = localStorage.getItem(STORAGE_KEYS.PROGRESS(dateStr));
+                        checked = raw ? JSON.parse(raw) : {};
+                    }
                     
                     const completedCount = dayTasks.filter(t => checked[t.id]).length;
-                    data.push({ date: i, dateStr, dow, total: dayTasks.length, uncompleted: dayTasks.length - completedCount, checkedData: checked });
+                    const dayEvents = events.filter(e => e.dateStr === dateStr);
+                    
+                    data.push({ date: i, dateStr, dow, total: dayTasks.length, uncompleted: dayTasks.length - completedCount, checkedData: checked, events: dayEvents });
                 }
                 return { year, month: month + 1, data };
-            }, [parentMonthOffset, allTasks, realToday, syncTrigger]);
+            }, [parentMonthOffset, allTasks, realToday, events, checkedItems, activeDateStr, syncTrigger]);
+
+            // 考試專用月曆資料
+            const examCalendarData = useMemo(() => {
+                const base = new Date(realToday);
+                base.setMonth(base.getMonth() + examMonthOffset);
+                const year = base.getFullYear();
+                const month = base.getMonth();
+                const firstDay = new Date(year, month, 1).getDay() || 7;
+                const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+                const data = [];
+                for(let i = 1; i < firstDay; i++) data.push(null);
+                
+                for(let i = 1; i <= daysInMonth; i++) {
+                    const d = new Date(year, month, i);
+                    const dateStr = getYYYYMMDD(d);
+                    const dayExams = exams.filter(e => e.dateStr === dateStr);
+                    data.push({ date: i, dateStr, exams: dayExams });
+                }
+                return { year, month: month + 1, data };
+            }, [examMonthOffset, realToday, exams]);
 
             const selectedLogDayObj = useMemo(() => {
                 return parentCalendarData.data.find(d => d && d.dateStr === selectedLogDateStr);
             }, [parentCalendarData, selectedLogDateStr]);
 
             const logDayTasks = useMemo(() => {
-                if (!selectedLogDayObj) return [];
-                return allTasks.filter(t => t.rule.includes(selectedLogDayObj.dow)).sort((a, b) => {
-                    const aC = selectedLogDayObj.checkedData[a.id];
-                    const bC = selectedLogDayObj.checkedData[b.id];
-                    if (aC === bC) return allTasks.findIndex(t=>t.id===a.id) - allTasks.findIndex(t=>t.id===b.id);
-                    return aC ? 1 : -1; 
-                });
-            }, [selectedLogDayObj, allTasks]);
+            if (!selectedLogDayObj) return [];
+            return allTasks.filter(t => t.rule.includes(selectedLogDayObj.dow)).sort((a, b) => {
+                const aC = selectedLogDayObj.checkedData[a.id];
+                const bC = selectedLogDayObj.checkedData[b.id];
+                if (aC === bC) return allTasks.findIndex(t=>t.id===a.id) - allTasks.findIndex(t=>t.id===b.id);
+                return aC ? 1 : -1; 
+            });
+        }, [selectedLogDayObj, allTasks]);
 
-            const handleLogTask = (taskId, dayObj) => {
-                const isCurrentlyChecked = !!dayObj.checkedData[taskId];
-                
-                if (isCurrentlyChecked) playSound('uncheck');
-                else playSound('check');
+        // ================= 核心動作處理區 ================= //
 
-                setAnimatingLogTasks(prev => ({ ...prev, [taskId]: !isCurrentlyChecked ? 'checking' : 'unchecking' }));
-                
-                setTimeout(() => {
-                    const updatedChecked = { ...dayObj.checkedData, [taskId]: !isCurrentlyChecked };
-                    robustSave(STORAGE_KEYS.PROGRESS(dayObj.dateStr), STORAGE_KEYS.PROGRESS_BAK(dayObj.dateStr), updatedChecked);
-                    
-                    checkAndUpdateCompletion(dayObj.dateStr, dayObj.dow, updatedChecked);
-                    setSyncTrigger(prev => prev + 1); 
-                    
-                    setAnimatingLogTasks(prev => {
-                        const next = {...prev};
-                        delete next[taskId];
-                        return next;
-                    });
-                }, 250); 
-            };
+        const handleLogTask = (taskId, dayObj) => {
+            // 從 localStorage 直取最新狀態，防連點覆蓋 Bug
+            const raw = localStorage.getItem(STORAGE_KEYS.PROGRESS(dayObj.dateStr));
+            const freshChecked = raw ? JSON.parse(raw) : { ...dayObj.checkedData };
+            const isCurrentlyChecked = !!freshChecked[taskId];
+            
+            if (isCurrentlyChecked) playSound('uncheck');
+            else playSound('check');
 
-            const toggleItem = (id) => {
-                if (mode === 'kid' && isFutureDate) return; 
-                if (mode === 'kid' && selectedDay !== (realToday.getDay() || 7)) return; 
+            setAnimatingLogTasks(prev => ({ ...prev, [taskId]: !isCurrentlyChecked ? 'checking' : 'unchecking' }));
+            
+            setTimeout(() => {
+                const updatedChecked = { ...freshChecked, [taskId]: !isCurrentlyChecked };
+                robustSave(STORAGE_KEYS.PROGRESS(dayObj.dateStr), STORAGE_KEYS.PROGRESS_BAK(dayObj.dateStr), updatedChecked);
+                checkAndUpdateCompletion(dayObj.dateStr, dayObj.dow, updatedChecked);
                 
-                const isNowChecked = !checkedItems[id];
-                const updatedChecked = { ...checkedItems, [id]: isNowChecked };
-                setCheckedItems(updatedChecked);
-                robustSave(STORAGE_KEYS.PROGRESS(activeDateStr), STORAGE_KEYS.PROGRESS_BAK(activeDateStr), updatedChecked);
-                
-                if (completionTimeouts.current[`cel_${id}`]) clearTimeout(completionTimeouts.current[`cel_${id}`]);
-                if (completionTimeouts.current[`tel_${id}`]) clearTimeout(completionTimeouts.current[`tel_${id}`]);
-                if (completionTimeouts.current[`sort_${id}`]) clearTimeout(completionTimeouts.current[`sort_${id}`]);
-                if (completionTimeouts.current[`fin_${id}`]) clearTimeout(completionTimeouts.current[`fin_${id}`]);
+                if (dayObj.dateStr === activeDateStr) {
+                    setCheckedItems(updatedChecked);
+                    setSortingCheckedItems(updatedChecked);
+                }
 
-                const nextCompletedCount = currentTasks.filter(t => updatedChecked[t.id]).length;
-                if (isNowChecked && nextCompletedCount === currentTasks.length && currentTasks.length > 0) {
+                // 強制月曆重繪
+                setSyncTrigger(prev => prev + 1); 
+                
+                setAnimatingLogTasks(prev => { const next = {...prev}; delete next[taskId]; return next; });
+            }, 250); 
+        };
+
+        const toggleItem = async (id) => {
+            if (mode === 'kid' && isFutureDate) return; 
+            if (mode === 'kid' && selectedDay !== (realToday.getDay() || 7)) return; 
+            if (isAnimatingRef.current) return; 
+            
+            const isNowChecked = !checkedItems[id];
+            const updatedChecked = { ...checkedItems, [id]: isNowChecked };
+            
+            setCheckedItems(updatedChecked);
+            robustSave(STORAGE_KEYS.PROGRESS(activeDateStr), STORAGE_KEYS.PROGRESS_BAK(activeDateStr), updatedChecked);
+            checkAndUpdateCompletion(activeDateStr, selectedDay, updatedChecked);
+            
+            const nextCompletedCount = currentTasks.filter(t => updatedChecked[t.id]).length;
+            const isFullComplete = isNowChecked && nextCompletedCount === currentTasks.length && currentTasks.length > 0;
+
+            if (isNowChecked) {
+                isAnimatingRef.current = true;
+                playSound('check');
+                triggerVibration(); 
+                
+                setCelebratingCards(prev => ({ ...prev, [id]: true }));
+                await delay(600); // 等待跳舞動畫結束
+
+                setTeleportingCards(prev => ({ ...prev, [id]: true }));
+                await delay(300); // 等待縮小動畫結束
+
+                setSortingCheckedItems(prev => ({ ...prev, [id]: true }));
+                await delay(50); 
+
+                setCelebratingCards(prev => ({ ...prev, [id]: false }));
+                setTeleportingCards(prev => ({ ...prev, [id]: false })); 
+                
+                // 動畫全部結束後，再判斷是否滿分並顯示慶祝畫面
+                if (isFullComplete) {
                     setShowCelebration(true);
                     playSound('tada'); 
                 }
+                isAnimatingRef.current = false;
+            } else {
+                playSound('uncheck');
+                setSortingCheckedItems(updatedChecked); 
+                setCelebratingCards(prev => ({ ...prev, [id]: false }));
+                setTeleportingCards(prev => ({ ...prev, [id]: false }));
+            }
+        };
 
-                if (isNowChecked) {
-                    playSound('check');
-                    triggerVibration(); 
-                    setCelebratingCards(prev => ({ ...prev, [id]: true }));
+        const handleAddExam = () => {
+                if (!examSubject || !examScore) return;
+                let scoreNum = parseInt(examScore, 10);
+                if (isNaN(scoreNum)) scoreNum = 0; if (scoreNum < 0) scoreNum = 0; if (scoreNum > 100) scoreNum = 100;
+                
+                const finalUnit = (!examUnitPrefix.endsWith('考') && !examUnitPrefix.endsWith('測驗') && examUnitNumber) 
+                    ? `第${examUnitNumber}${examUnitPrefix}` 
+                    : examUnitPrefix;
 
-                    completionTimeouts.current[`cel_${id}`] = setTimeout(() => {
-                        setTeleportingCards(prev => ({ ...prev, [id]: true }));
-                        
-                        completionTimeouts.current[`sort_${id}`] = setTimeout(() => {
-                            setSortingCheckedItems(prev => ({ ...prev, [id]: true }));
-                            
-                            completionTimeouts.current[`fin_${id}`] = setTimeout(() => {
-                                setCelebratingCards(prev => ({ ...prev, [id]: false }));
-                                setTeleportingCards(prev => ({ ...prev, [id]: false }));
-                            }, 50); 
-                        }, 300);
-                    }, 600); 
-                } else {
-                    playSound('uncheck');
-                    setSortingCheckedItems(prev => ({ ...prev, [id]: false }));
-                    setCelebratingCards(prev => ({ ...prev, [id]: false }));
-                    setTeleportingCards(prev => ({ ...prev, [id]: false }));
-                }
+                const newExam = { id: Date.now().toString(), dateStr: examDate || selectedExamDateStr, subject: examSubject, type: examType, unit: finalUnit, score: scoreNum };
+                const updated = [newExam, ...exams];
+                setExams(updated); robustSave(STORAGE_KEYS.EXAMS, STORAGE_KEYS.EXAMS + '_bak', updated);
+                setShowExamModal(false); setExamSubject(''); setExamScore(''); setExamUnitPrefix('單元'); setExamUnitNumber('');
+                if (scoreNum === 100) { playSound('tada'); setShowCelebration(true); } else if (scoreNum >= 90) { playSound('check'); }
+            };
+
+            const handleDeleteExam = (id) => {
+                const updated = exams.filter(e => e.id !== id);
+                setExams(updated); robustSave(STORAGE_KEYS.EXAMS, STORAGE_KEYS.EXAMS + '_bak', updated);
+            };
+
+            const handleAddSubject = () => {
+                if(!newSubjectInput.trim() || examSubjects.includes(newSubjectInput.trim())) return;
+                const updated = [...examSubjects, newSubjectInput.trim()];
+                setExamSubjects(updated); robustSave(STORAGE_KEYS.EXAM_SUBJECTS, STORAGE_KEYS.EXAM_SUBJECTS + '_bak', updated);
+                setNewSubjectInput('');
+            };
+            const handleDeleteSubject = (sub) => {
+                const updated = examSubjects.filter(s => s !== sub);
+                setExamSubjects(updated); robustSave(STORAGE_KEYS.EXAM_SUBJECTS, STORAGE_KEYS.EXAM_SUBJECTS + '_bak', updated);
+            };
+
+            const handleAddType = () => {
+                if(!newTypeInput.trim() || examTypes.includes(newTypeInput.trim())) return;
+                const updated = [...examTypes, newTypeInput.trim()];
+                setExamTypes(updated); robustSave(STORAGE_KEYS.EXAM_TYPES, STORAGE_KEYS.EXAM_TYPES + '_bak', updated);
+                setNewTypeInput('');
+            };
+            const handleDeleteType = (type) => {
+                const updated = examTypes.filter(t => t !== type);
+                setExamTypes(updated); robustSave(STORAGE_KEYS.EXAM_TYPES, STORAGE_KEYS.EXAM_TYPES + '_bak', updated);
+            };
+
+            const handleAddUnit = () => {
+                if(!newUnitInput.trim() || examUnits.includes(newUnitInput.trim())) return;
+                const updated = [...examUnits, newUnitInput.trim()];
+                setExamUnits(updated); robustSave(STORAGE_KEYS.EXAM_UNITS, STORAGE_KEYS.EXAM_UNITS + '_bak', updated);
+                setNewUnitInput('');
+            };
+            const handleDeleteUnit = (u) => {
+                const updated = examUnits.filter(x => x !== u);
+                setExamUnits(updated); robustSave(STORAGE_KEYS.EXAM_UNITS, STORAGE_KEYS.EXAM_UNITS + '_bak', updated);
             };
 
             const addTask = () => {
                 const newTask = { id: Date.now().toString(), cat: '日常', title: '', rule: [1, 3, 4] };
                 const updated = [newTask, ...allTasks];
-                setAllTasks(updated);
-                robustSave(STORAGE_KEYS.TASKS, STORAGE_KEYS.TASKS_BAK, updated);
-                setSyncTrigger(prev => prev + 1);
+                setAllTasks(updated); robustSave(STORAGE_KEYS.TASKS, STORAGE_KEYS.TASKS_BAK, updated); setSyncTrigger(prev => prev + 1);
             };
 
             const confirmRemoveTask = (id) => {
                 const updated = allTasks.filter(t => t.id !== id);
-                setAllTasks(updated);
-                robustSave(STORAGE_KEYS.TASKS, STORAGE_KEYS.TASKS_BAK, updated);
-                setDeleteConfirmId(null);
-                setSyncTrigger(prev => prev + 1);
+                setAllTasks(updated); robustSave(STORAGE_KEYS.TASKS, STORAGE_KEYS.TASKS_BAK, updated);
+                setDeleteConfirmId(null); setSyncTrigger(prev => prev + 1);
             };
 
             const updateTask = (id, field, value) => {
                 const updated = allTasks.map(t => t.id === id ? { ...t, [field]: value } : t);
-                setAllTasks(updated);
-                robustSave(STORAGE_KEYS.TASKS, STORAGE_KEYS.TASKS_BAK, updated);
-                setSyncTrigger(prev => prev + 1);
+                setAllTasks(updated); robustSave(STORAGE_KEYS.TASKS, STORAGE_KEYS.TASKS_BAK, updated); setSyncTrigger(prev => prev + 1);
             };
 
             const toggleTaskRule = (taskId, dayId) => {
@@ -782,30 +1053,29 @@
                     }
                     return t;
                 });
-                setAllTasks(updated);
-                robustSave(STORAGE_KEYS.TASKS, STORAGE_KEYS.TASKS_BAK, updated);
-                setSyncTrigger(prev => prev + 1);
+                setAllTasks(updated); robustSave(STORAGE_KEYS.TASKS, STORAGE_KEYS.TASKS_BAK, updated); setSyncTrigger(prev => prev + 1);
             };
 
             const handleClaimReward = (rewardObj) => {
-                const title = pendingRewardsInputs[rewardObj.periodId];
+                const title = pendingRewardsInputs[rewardObj.periodId] !== undefined ? pendingRewardsInputs[rewardObj.periodId] : rewardObj.defaultRewardName;
                 if (!title || !title.trim()) return;
 
                 let sortKey = rewardObj.periodId.substring(2);
                 if (rewardObj.type === 'monthly') sortKey += '-01';
+                if (rewardObj.type === 'exam') sortKey = getYYYYMMDD(realToday) + '-' + Date.now();
 
                 const newRecord = {
                     id: Date.now().toString(),
-                    periodId: rewardObj.periodId,
+                    periodId: rewardObj.type === 'exam' ? `${rewardObj.periodId}-${Date.now()}` : rewardObj.periodId,
                     periodLabel: rewardObj.label,
                     title: title.trim(),
                     date: formattedDate,
                     type: rewardObj.type,
+                    ruleId: rewardObj.ruleId,
                     sortKey: sortKey
                 };
                 const updated = [newRecord, ...rewards];
-                setRewards(updated);
-                robustSave(STORAGE_KEYS.REWARDS, STORAGE_KEYS.REWARDS + '_bak', updated);
+                setRewards(updated); robustSave(STORAGE_KEYS.REWARDS, STORAGE_KEYS.REWARDS + '_bak', updated);
                 
                 setPendingRewardsInputs(prev => {
                     const next = {...prev};
@@ -816,52 +1086,24 @@
 
             const handleDeleteReward = (id) => {
                 const updated = rewards.filter(r => r.id !== id);
-                setRewards(updated);
-                robustSave(STORAGE_KEYS.REWARDS, STORAGE_KEYS.REWARDS + '_bak', updated);
+                setRewards(updated); robustSave(STORAGE_KEYS.REWARDS, STORAGE_KEYS.REWARDS + '_bak', updated);
             };
 
-            const startEditReward = (reward) => {
-                setEditingRewardId(reward.id);
-                setEditRewardTitle(reward.title);
-            };
-
+            const startEditReward = (reward) => { setEditingRewardId(reward.id); setEditRewardTitle(reward.title); };
             const saveEditReward = () => {
                 if (!editRewardTitle.trim()) return;
                 const updated = rewards.map(r => r.id === editingRewardId ? { ...r, title: editRewardTitle.trim() } : r);
-                setRewards(updated);
-                robustSave(STORAGE_KEYS.REWARDS, STORAGE_KEYS.REWARDS + '_bak', updated);
-                setEditingRewardId(null);
+                setRewards(updated); robustSave(STORAGE_KEYS.REWARDS, STORAGE_KEYS.REWARDS + '_bak', updated); setEditingRewardId(null);
             };
 
-            const isPeriodFullyCompleted = useCallback((periodId) => {
-                const completedSet = new Set(completedDates);
-                if (periodId.startsWith('W-')) {
-                    const dateStr = periodId.substring(2);
-                    const start = new Date(dateStr);
-                    for(let i=0; i<7; i++) {
-                        const cur = new Date(start);
-                        cur.setDate(cur.getDate() + i);
-                        if (!isDayActuallyCompleted(getYYYYMMDD(cur), completedSet, allTasks)) return false;
-                    }
-                    return true;
-                } else if (periodId.startsWith('M-')) {
-                    const parts = periodId.substring(2).split('-');
-                    const y = parseInt(parts[0], 10);
-                    const m = parseInt(parts[1], 10);
-                    const daysInMonth = new Date(y, m, 0).getDate();
-                    for(let i=1; i<=daysInMonth; i++) {
-                        const cur = `${y}-${String(m).padStart(2,'0')}-${String(i).padStart(2,'0')}`;
-                        if (!isDayActuallyCompleted(cur, completedSet, allTasks)) return false;
-                    }
-                    return true;
-                }
-                return true;
-            }, [completedDates, allTasks]);
+            const handleAIPhotoUpload = (e) => {
+                // Mock behavior for testing AI logic
+            };
 
-            const sortedRewardsHistory = useMemo(() => {
-                return [...rewards].sort((a, b) => (b.sortKey || b.id).localeCompare(a.sortKey || a.id));
-            }, [rewards]);
-
+            const sortedRewardsHistory = useMemo(() => { return [...rewards].sort((a, b) => (b.sortKey || b.id).localeCompare(a.sortKey || a.id)); }, [rewards]);
+            
+            const activeExams = useMemo(() => { return exams.filter(e => e.dateStr === selectedExamDateStr); }, [exams, selectedExamDateStr]);
+            
             const dynamicColor = useMemo(() => {
                 if (currentTasks.length === 0 || completedCount === 0) return "#94a3b8"; 
                 const ratio = completedCount / currentTasks.length;
@@ -877,24 +1119,139 @@
                 return "洋洋，太棒了！";
             }, [progress, currentTasks.length]);
 
-            const confettiRender = useMemo(() => {
+            const kidExamRewards = useMemo(() => unclaimedRewards.filter(r => r.type === 'exam'), [unclaimedRewards]);
+
+            const confettiElements = useMemo(() => {
                 return [...Array(30)].map((_, i) => {
                     const colors = ['#ef4444', '#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899'];
-                    return (
-                        <div key={i} className="absolute rounded-sm animate-confetti-fall"
-                             style={{ backgroundColor: colors[i % colors.length], left: `${Math.random() * 100}%`, width: `10px`, height: `8px`, animationDuration: `${Math.random() * 2 + 2}s`, animationDelay: `${Math.random() * 3}s`, opacity: Math.random() + 0.5 }} />
-                    );
+                    return <div key={i} className="absolute rounded-sm animate-confetti-fall" style={{ backgroundColor: colors[i % colors.length], left: `${Math.random() * 100}%`, width: `10px`, height: `8px`, animationDuration: `${Math.random() * 2 + 2}s`, animationDelay: `${Math.random() * 3}s`, opacity: Math.random() + 0.5 }} />;
                 });
             }, []);
 
             return (
-                <div className="app-container" onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd}>
+                <div className="app-container h-[100dvh] w-screen overflow-hidden bg-slate-200 flex justify-center" onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd}>
+                    
+                    <input type="file" accept="image/*" ref={photoInputRef} className="hidden" onChange={handleAIPhotoUpload} />
 
+                    {/* 行事曆事件新增彈窗 */}
+                    {showEventModal && (
+                        <div className="fixed inset-0 z-[300] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setShowEventModal(false)}>
+                            <div className="bg-white rounded-[2rem] p-6 w-full max-w-sm shadow-2xl animate-slide-down" onClick={e => e.stopPropagation()}>
+                                <div className="flex justify-between items-center mb-4">
+                                    <h3 className="text-xl font-black text-slate-800 flex items-center gap-2"><Icon name="Calendar" className="w-5 h-5 text-indigo-500" /> 行事曆記錄</h3>
+                                    <button onClick={() => setShowEventModal(false)} className="text-slate-400 hover:text-slate-600 bg-slate-100 rounded-full w-8 h-8 flex items-center justify-center"><Icon name="X" className="w-5 h-5"/></button>
+                                </div>
+                                <p className="text-slate-500 font-bold mb-4 text-center">{selectedEventDate}</p>
+                                
+                                {mode === 'parent' && (
+                                    <button onClick={() => photoInputRef.current.click()} disabled={isAnalyzingPhoto} className="w-full mb-6 bg-indigo-50 text-indigo-600 border border-indigo-200 py-3 rounded-xl font-bold text-sm hover:bg-indigo-100 transition-colors flex justify-center items-center gap-2">
+                                        {isAnalyzingPhoto ? <Icon name="Loader" className="animate-spin w-5 h-5" /> : <Icon name="Camera" className="w-5 h-5" />}
+                                        {isAnalyzingPhoto ? 'AI 辨識中...' : '📸 AI 拍照/截圖自動填寫'}
+                                    </button>
+                                )}
+                                
+                                <div className="space-y-4 mb-6">
+                                    <div>
+                                        <label className="block text-sm font-bold text-slate-500 mb-2">事件類型</label>
+                                        <div className="grid grid-cols-2 gap-2">
+                                            {Object.entries(EVENT_TYPES).map(([key, info]) => (
+                                                <button key={key} onClick={() => setNewEventType(key)} 
+                                                    className={`py-2 rounded-xl font-bold border-2 transition-all ${newEventType === key ? info.color + ' ring-2 ring-offset-1 ring-opacity-50' : 'bg-slate-50 text-slate-500 border-transparent hover:bg-slate-100'}`}>
+                                                    {info.label}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-bold text-slate-500 mb-2">事件內容</label>
+                                        <input type="text" value={newEventTitle} onChange={e=>setNewEventTitle(e.target.value)} onKeyDown={(e) => {if(e.key === 'Enter'){ const newEvt = { id: Date.now().toString(), dateStr: selectedEventDate, type: newEventType, title: newEventTitle.trim() }; const updated = [...events, newEvt]; setEvents(updated); robustSave(STORAGE_KEYS.EVENTS, STORAGE_KEYS.EVENTS + '_bak', updated); setNewEventTitle(''); playSound('check');}}} placeholder="輸入事項..." className="w-full bg-slate-50 border-2 border-slate-200 rounded-xl px-4 py-3 font-bold outline-none focus:border-indigo-400 focus:bg-white transition-colors" />
+                                    </div>
+                                    <button onClick={() => { if (!newEventTitle.trim()) return; const newEvt = { id: Date.now().toString(), dateStr: selectedEventDate, type: newEventType, title: newEventTitle.trim() }; const updated = [...events, newEvt]; setEvents(updated); robustSave(STORAGE_KEYS.EVENTS, STORAGE_KEYS.EVENTS + '_bak', updated); setNewEventTitle(''); playSound('check'); }} className="w-full bg-indigo-500 text-white py-3 rounded-xl font-black text-lg shadow-md hover:bg-indigo-600 transition-colors active:scale-95 flex justify-center items-center gap-2">
+                                        <Icon name="Plus" className="w-5 h-5" /> 新增事件
+                                    </button>
+                                </div>
+
+                                <div className="space-y-2 border-t pt-4">
+                                    <p className="text-xs font-bold text-slate-400 mb-2">當日事件</p>
+                                    {events.filter(e => e.dateStr === selectedEventDate).length > 0 ? (
+                                        events.filter(e => e.dateStr === selectedEventDate).map(e => (
+                                            <div key={e.id} className={`flex items-center justify-between p-3 rounded-xl border ${EVENT_TYPES[e.type].color}`}>
+                                                <div className="overflow-hidden pr-2">
+                                                    <span className="text-[10px] font-black px-1.5 py-0.5 rounded bg-white/70 mr-1.5 align-middle">{EVENT_TYPES[e.type].label}</span>
+                                                    <span className="font-bold text-sm">{e.title}</span>
+                                                </div>
+                                                <button onClick={() => { const updated = events.filter(ev => ev.id !== e.id); setEvents(updated); robustSave(STORAGE_KEYS.EVENTS, STORAGE_KEYS.EVENTS + '_bak', updated); playSound('uncheck'); }} className="p-1 hover:bg-white/50 rounded shrink-0"><Icon name="Trash2" className="w-4 h-4" /></button>
+                                            </div>
+                                        ))
+                                    ) : (
+                                        <div className="text-center text-sm text-slate-400 py-2">無事件</div>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* 考試紀錄彈窗 */}
+                    {showExamModal && (
+                        <div className="fixed inset-0 z-[300] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setShowExamModal(false)}>
+                            <div className="bg-white rounded-[2rem] p-6 w-full max-w-sm shadow-2xl animate-slide-down flex flex-col max-h-[85vh]" onClick={e => e.stopPropagation()}>
+                                <h3 className="text-2xl font-black text-slate-800 mb-4 text-center shrink-0">📝 記錄考試成績</h3>
+                                <div className="space-y-4 mb-6 overflow-y-auto pr-1 flex-1 no-scrollbar">
+                                    <div>
+                                        <label className="block text-sm font-bold text-slate-500 mb-2">考試日期</label>
+                                        <input type="date" value={examDate} onChange={e=>setExamDate(e.target.value)} className="w-full bg-slate-50 border-2 border-slate-200 rounded-xl px-4 py-2 font-bold outline-none focus:border-yellow-400 focus:bg-white transition-colors" />
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-bold text-slate-500 mb-2">這是哪一種考試？</label>
+                                        <div className="flex flex-wrap gap-2 mb-2">
+                                            {examTypes.map(type => (
+                                                <button key={type} onClick={() => setExamType(type)} className={`px-4 py-2 rounded-xl text-sm font-black transition-all ${examType === type ? 'bg-orange-500 text-white shadow-md' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}>{type}</button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-bold text-slate-500 mb-2">考了什麼科目？</label>
+                                        <div className="flex flex-wrap gap-2 mb-2">
+                                            {examSubjects.map(sub => (
+                                                <button key={sub} onClick={() => setExamSubject(sub)} className={`border px-3 py-1.5 rounded-lg text-sm font-bold transition-colors active:scale-95 ${examSubject === sub ? 'bg-yellow-400 text-white border-yellow-500 shadow-sm' : 'bg-yellow-50 border-yellow-200 text-yellow-700 hover:bg-yellow-100'}`}>{sub}</button>
+                                            ))}
+                                        </div>
+                                        <input type="text" value={examSubject} onChange={e=>setExamSubject(e.target.value)} placeholder="或手動輸入其他科目" className="w-full bg-slate-50 border-2 border-slate-200 rounded-xl px-4 py-2 font-bold outline-none focus:border-yellow-400 focus:bg-white transition-colors" />
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-bold text-slate-500 mb-2">單元或課 (範圍)</label>
+                                        <div className="flex flex-wrap gap-2 mb-2">
+                                            {examUnits.map(u => (
+                                                <button key={u} onClick={() => { setExamUnitPrefix(u); setExamUnitNumber(''); }} className={`border px-3 py-1.5 rounded-lg text-sm font-bold transition-colors active:scale-95 ${examUnitPrefix === u ? 'bg-yellow-400 text-white border-yellow-500 shadow-sm' : 'bg-yellow-50 border-yellow-200 text-yellow-700 hover:bg-yellow-100'}`}>{u}</button>
+                                            ))}
+                                        </div>
+                                        {(!examUnitPrefix.endsWith('考') && !examUnitPrefix.endsWith('測驗')) && (
+                                            <div className="flex items-center gap-2 mt-2 bg-slate-50 border-2 border-slate-200 rounded-xl px-4 py-2 focus-within:border-yellow-400 focus-within:bg-white transition-colors">
+                                                <span className="font-black text-slate-600">第</span>
+                                                <input type="number" value={examUnitNumber} onChange={e=>setExamUnitNumber(e.target.value)} placeholder="輸入數字..." className="bg-transparent font-black outline-none w-full text-center text-lg text-yellow-600" />
+                                                <span className="font-black text-slate-600">{examUnitPrefix}</span>
+                                            </div>
+                                        )}
+                                    </div>
+                                    <div className="pt-2">
+                                        <label className="block text-sm font-bold text-slate-500 mb-2">考了幾分呢？</label>
+                                        <input type="number" value={examScore} onChange={e=>setExamScore(e.target.value)} placeholder="0 ~ 100" className="w-full bg-slate-50 border-2 border-slate-200 rounded-xl px-4 py-3 font-black text-3xl text-center outline-none focus:border-yellow-400 focus:bg-white transition-colors text-yellow-600" />
+                                    </div>
+                                </div>
+                                <div className="flex gap-3 shrink-0 pt-2">
+                                    <button onClick={handleAddExam} className="flex-1 bg-yellow-400 text-white py-3 rounded-xl font-black text-lg shadow-md hover:bg-yellow-500 transition-colors active:scale-95">存檔</button>
+                                    <button onClick={() => setShowExamModal(false)} className="flex-1 bg-slate-200 text-slate-600 py-3 rounded-xl font-black text-lg hover:bg-slate-300 transition-colors active:scale-95">取消</button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* 慶祝動畫彈窗 */}
                     {showCelebration && (
                         <div className="fixed inset-0 z-[250] flex flex-col items-center justify-center bg-black/60 backdrop-blur-sm cursor-pointer animate-in fade-in duration-500 px-4 text-center"
                              onClick={() => setShowCelebration(false)}>
                             <div className="fixed inset-0 pointer-events-none overflow-hidden">
-                                {confettiRender}
+                                {confettiElements}
                             </div>
                             <div className="relative flex flex-col items-center justify-center w-full max-w-2xl transform scale-75 sm:scale-100 mt-10">
                                 <div className="relative flex items-center justify-center w-48 h-48 md:w-64 md:h-64 mb-8">
@@ -906,133 +1263,363 @@
                                 </div>
                                 <div className="relative z-[160] bg-gradient-to-r from-yellow-300 via-orange-500 to-yellow-300 p-1 rounded-[3rem] shadow-2xl">
                                     <div className="bg-white px-10 py-12 rounded-[2.8rem] flex flex-col items-center overflow-hidden text-center">
-                                        <h2 className="text-4xl sm:text-6xl font-black italic text-orange-600 mb-2 whitespace-nowrap">任務達成!!</h2>
-                                        <p className="text-slate-400 font-bold tracking-widest uppercase">Mission Accomplished</p>
+                                        <h2 className="text-4xl sm:text-6xl font-black italic text-orange-600 mb-2 whitespace-nowrap">太棒了!!</h2>
+                                        <p className="text-slate-400 font-bold tracking-widest uppercase">Excellent Performance</p>
                                     </div>
                                 </div>
                             </div>
                         </div>
                     )}
 
-                    <div className="main-card p-1.5 md:p-3 lg:p-6 relative overflow-hidden">
+                    <div className="w-full max-w-4xl flex flex-col h-full relative shadow-2xl bg-white border-x-4 border-slate-200">
                         
-                        <div className="flex justify-center mb-2 flex-shrink-0 z-10 relative">
-                            <div className="bg-white/90 backdrop-blur-sm p-1 rounded-xl shadow-sm border border-slate-200 flex gap-1 items-center">
-                                <button onClick={() => { setMode('kid'); setParentTab('log'); }}
-                                    className={`px-6 py-1.5 rounded-lg text-xs font-bold transition-all ${mode === 'kid' ? 'bg-orange-500 text-white shadow-md' : 'text-slate-400 hover:text-orange-400'}`}>
+                        {/* 家長登入鎖定遮罩 */}
+                        {mode === 'parent' && !isParentAuth && (
+                            <div className="absolute inset-0 z-[100] bg-slate-900 flex flex-col items-center justify-center animate-in p-6">
+                                <div className="w-full max-w-sm bg-slate-800 rounded-[2.5rem] p-8 shadow-2xl border border-slate-700 text-center relative overflow-hidden">
+                                    <div className="w-16 h-16 bg-indigo-500/20 text-indigo-400 rounded-full flex items-center justify-center mx-auto mb-4 border-2 border-indigo-500/50 shadow-[0_0_15px_rgba(99,102,241,0.3)]">
+                                        <Icon name="Lock" className="w-8 h-8" />
+                                    </div>
+                                    <h2 className="text-2xl font-black text-white mb-2 tracking-widest">皇室管理區</h2>
+                                    <p className="text-slate-400 text-xs font-bold mb-6">請輸入 4 位數 PIN 碼，或使用生物辨識解鎖</p>
+                                    
+                                    {loginError && <p className="text-red-400 text-xs font-bold mb-4 animate-shake">{loginError}</p>}
+                                    
+                                    {hasBioBound && (
+                                        <button onClick={loginWithBiometrics} className="w-full py-4 bg-indigo-600 hover:bg-indigo-500 text-white rounded-2xl font-black mb-6 active:scale-95 transition-all shadow-lg flex justify-center items-center gap-2">
+                                            <Icon name="Fingerprint" className="w-5 h-5" /> 生物辨識快速登入
+                                        </button>
+                                    )}
+                                    
+                                    <div className="flex justify-center gap-3 mb-8">
+                                        {[...Array(4)].map((_, i) => <div key={i} className={`w-3.5 h-3.5 rounded-full border-2 border-indigo-500 transition-all duration-200 ${loginPin.length > i ? "bg-indigo-400 scale-125 shadow-[0_0_10px_rgba(99,102,241,0.6)]" : "bg-transparent"}`}></div>)}
+                                    </div>
+
+                                    <div className="grid grid-cols-3 gap-3 text-white">
+                                        {[1,2,3,4,5,6,7,8,9,"C",0,"←"].map(k => (
+                                            <button key={k} onClick={() => {
+                                                if (k === "C") { setLoginPin(""); return; }
+                                                if (k === "←") { setLoginPin(loginPin.slice(0,-1)); return; }
+                                                const n = loginPin + k; 
+                                                if (n.length > 4) return; 
+                                                setLoginPin(n);
+                                                if (n.length === 4) handlePinLogin(n);
+                                            }} className="bg-white/5 h-14 rounded-xl font-black text-2xl active:bg-indigo-600 transition-all border border-white/5 shadow-sm">
+                                                {k}
+                                            </button>
+                                        ))}
+                                    </div>
+                                    
+                                    <div className="mt-8 flex justify-between items-center px-2">
+                                        <button onClick={() => { setMode('kid'); setLoginPin(''); setLoginError(''); }} className="text-slate-400 text-xs font-bold underline underline-offset-4 hover:text-white">返回洋洋模式</button>
+                                        <button onClick={() => alert("【緊急救援】\n若忘記密碼，請輸入救援萬用碼：9999\n這會強制解鎖並將密碼重置為 0000。")} className="text-slate-500 text-[10px] font-bold">忘記密碼？</button>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* 頂部切換鈕 */}
+                        <div className="flex justify-center shrink-0 w-full z-20 pt-3 pb-3 bg-slate-100 border-b border-slate-200">
+                            <div className="bg-white/80 backdrop-blur-md p-1.5 rounded-xl shadow-sm border border-slate-200 flex gap-1 items-center">
+                                <button onClick={() => { setMode('kid'); setKidTab('tasks'); setIsParentAuth(false); }}
+                                    className={`px-8 py-2 rounded-lg text-sm font-black transition-all ${mode === 'kid' ? 'bg-orange-500 text-white shadow-md scale-105' : 'text-slate-400 hover:text-orange-400'}`}>
                                     洋洋模式
                                 </button>
-                                <button onClick={() => setMode('parent')}
-                                    className={`px-6 py-1.5 rounded-lg text-xs font-bold transition-all ${mode === 'parent' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400 hover:text-indigo-400'}`}>
+                                <button onClick={() => { setMode('parent'); setParentTab('log'); }}
+                                    className={`px-8 py-2 rounded-lg text-sm font-black transition-all ${mode === 'parent' ? 'bg-indigo-600 text-white shadow-md scale-105' : 'text-slate-400 hover:text-indigo-400'}`}>
                                     皇室管理
                                 </button>
                             </div>
                         </div>
 
-                        <div className={`bg-white rounded-[2rem] md:rounded-[3.5rem] shadow-xl overflow-hidden border-b-[10px] main-card transition-all duration-500 flex flex-col relative ${mode === 'kid' ? 'border-orange-400' : 'border-indigo-800'}`}>
-                            
-                            {/* 洋洋專屬模式 */}
+                        <div className="main-card relative bg-slate-50">
+                            {/* 洋洋模式內容 */}
                             {mode === 'kid' && (
-                                <>
-                                    <div className="px-6 py-4 md:px-10 md:py-8 text-white relative flex-shrink-0 bg-gradient-to-br from-orange-400 via-rose-400 to-rose-500">
-                                        <div className="flex justify-between items-start mb-4">
-                                           <div className="bg-white/20 px-5 py-2 rounded-2xl shadow-sm flex items-center gap-3">
-                                              <Icon name="Calendar" className="w-6 h-6 opacity-70" />
-                                              <h2 className="text-xl sm:text-2xl md:text-3xl font-black tracking-tighter">{formattedDate}</h2>
-                                           </div>
+                                <div className="flex flex-col h-full relative">
+                                    
+                                    <div className="flex px-4 md:px-8 gap-1 z-10 relative bg-slate-100 shrink-0 justify-start items-end border-b-0 pt-2 overflow-x-auto no-scrollbar">
+                                        <button onClick={() => setKidTab('tasks')}
+                                            className={`relative px-4 py-2.5 md:px-8 md:py-3 font-black text-sm md:text-base rounded-t-2xl transition-all duration-300 ease-in-out shrink-0
+                                            ${kidTab === 'tasks' ? 'bg-gradient-to-r from-orange-400 to-rose-500 text-white z-20 pb-4 -mb-1 shadow-[0_-5px_15px_rgba(0,0,0,0.1)]' : 'bg-slate-200/70 text-slate-500 hover:bg-slate-200 z-10 border border-b-0 border-slate-300'}`}>
+                                            作息表
+                                        </button>
+                                        <button onClick={() => setKidTab('exams')}
+                                            className={`relative px-4 py-2.5 md:px-8 md:py-3 font-black text-sm md:text-base rounded-t-2xl transition-all duration-300 ease-in-out shrink-0
+                                            ${kidTab === 'exams' ? 'bg-white text-orange-600 z-20 pb-4 -mb-1 shadow-[0_-5px_15px_rgba(0,0,0,0.1)]' : 'bg-slate-200/70 text-slate-500 hover:bg-slate-200 z-10 border border-b-0 border-slate-300'}`}>
+                                            考試
+                                        </button>
+                                        <button onClick={() => setKidTab('calendar')}
+                                            className={`relative px-4 py-2.5 md:px-8 md:py-3 font-black text-sm md:text-base rounded-t-2xl transition-all duration-300 ease-in-out shrink-0
+                                            ${kidTab === 'calendar' ? 'bg-white text-emerald-600 z-20 pb-4 -mb-1 shadow-[0_-5px_15px_rgba(0,0,0,0.1)]' : 'bg-slate-200/70 text-slate-500 hover:bg-slate-200 z-10 border border-b-0 border-slate-300'}`}>
+                                            行事曆
+                                        </button>
+                                    </div>
+
+                                    {/* 頂部月曆選擇器 (作息表顯示週曆) */}
+                                    {kidTab === 'tasks' && (
+                                        <div className="flex justify-around px-2 py-2 md:px-10 md:py-4 bg-white border-b border-slate-100 no-scrollbar gap-1 flex-shrink-0 shadow-sm relative z-10 overflow-x-auto">
+                                            {daysWithDates.map((day) => (
+                                                <button key={day.id} onClick={() => setSelectedDay(day.id)}
+                                                    className={`flex-shrink-0 w-12 h-16 sm:w-16 sm:h-20 md:w-24 md:h-28 rounded-2xl flex flex-col items-center justify-center transition-all duration-300 ${
+                                                        selectedDay === day.id ? 'bg-orange-500 text-white shadow-lg scale-105' : 'text-slate-300 hover:bg-slate-50'
+                                                    }`}>
+                                                    <span className={`text-[10px] md:text-[16px] font-black mb-1 opacity-90 ${selectedDay === day.id ? 'text-white' : 'text-slate-500'}`}>{day.dateStr}</span>
+                                                    <span className="text-lg md:text-3xl font-black tracking-tighter">{day.label}</span>
+                                                    {day.id === realDayOfWeek && <div className={`w-1.5 h-1.5 rounded-full mt-1 ${selectedDay === day.id ? 'bg-white' : 'bg-orange-400'}`} />}
+                                                </button>
+                                            ))}
                                         </div>
-                                        
-                                        <div className="flex flex-row items-center justify-between gap-4">
-                                            <div className="flex-1">
-                                                <h1 className="text-3xl sm:text-5xl md:text-7xl font-black tracking-tighter leading-tight mb-3 drop-shadow-sm">{greetingText}</h1>
-                                                <div className="flex flex-col items-start gap-2">
-                                                    <p className="text-sm sm:text-lg md:text-xl font-bold bg-black/10 px-6 py-2 rounded-2xl inline-flex items-center gap-2">
-                                                        {progress === 100 && currentTasks.length > 0 ? "🏆 完美的王者表現！" : `任務：${completedCount}/${currentTasks.length}`}
-                                                    </p>
-                                                    <p className="text-sm sm:text-base md:text-lg font-bold bg-white/20 px-5 py-2 rounded-xl inline-flex items-center gap-2 text-white border border-white/30">
-                                                        🔥 連續達標：{currentStreak} 天
-                                                    </p>
+                                    )}
+
+                                    {/* 頂部月曆選擇器 (考試顯示月曆) */}
+                                    {kidTab === 'exams' && (
+                                        <div className="bg-white border-b border-slate-200 overflow-hidden relative z-10 shadow-sm flex-shrink-0">
+                                            <div className="bg-yellow-50 border-b border-yellow-100 px-4 py-2 flex justify-between items-center">
+                                                <h3 className="font-black flex items-center gap-2 text-yellow-700"><Icon name="Calendar" className="w-4 h-4"/> 考試月曆</h3>
+                                                <div className="flex items-center gap-3 bg-white px-2 py-1 rounded-lg border shadow-sm border-yellow-100">
+                                                    <button onClick={() => setExamMonthOffset(p => p - 1)} className="p-1 rounded text-yellow-600 hover:bg-yellow-50"><Icon name="ChevronLeft" className="w-4 h-4"/></button>
+                                                    <span className="font-bold text-xs w-16 text-center text-slate-700">{examCalendarData.year}/{String(examCalendarData.month).padStart(2, '0')}</span>
+                                                    <button onClick={() => setExamMonthOffset(p => p + 1)} className="p-1 rounded text-yellow-600 hover:bg-yellow-50"><Icon name="ChevronRight" className="w-4 h-4"/></button>
                                                 </div>
                                             </div>
-                                            <div className="flex-shrink-0 w-28 h-28 sm:w-36 sm:h-36 md:w-48 md:h-48 aspect-square flex items-center justify-center bg-white/10 rounded-full border-[6px] border-white/20 shadow-lg relative overflow-hidden group">
-                                                {progress === 100 ? (
-                                                    <div className="absolute inset-0 flex items-center justify-center z-10 animate-in zoom-in duration-500">
-                                                        <CustomNewTrophy color={dynamicColor} />
-                                                    </div>
-                                                ) : (
-                                                    <span className="absolute inset-0 flex items-center justify-center text-3xl sm:text-5xl md:text-7xl font-black z-10 text-white tracking-tighter">
-                                                        {progress}<span className="text-sm sm:text-xl ml-0.5 opacity-70">%</span>
-                                                    </span>
-                                                )}
-                                                <svg className="absolute inset-0 w-full h-full -rotate-90 p-0" viewBox="0 0 100 100">
-                                                    <circle cx="50" cy="50" r="44" fill="transparent" stroke="rgba(255,255,255,0.1)" strokeWidth="8" />
-                                                    <circle cx="50" cy="50" r="44" fill="transparent" stroke={dynamicColor} strokeWidth="8" strokeDasharray="276.46" strokeDashoffset={`${276.46 - (276.46 * progress / 100)}`} strokeLinecap="round" className="transition-all duration-1000 ease-in-out shadow-sm" />
-                                                </svg>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <div className="flex justify-around px-4 py-3 md:px-10 md:py-6 bg-white border-b border-slate-50 no-scrollbar gap-1 flex-shrink-0">
-                                        {daysWithDates.map((day) => (
-                                            <button key={day.id} onClick={() => setSelectedDay(day.id)}
-                                                className={`flex-shrink-0 w-16 h-18 sm:w-20 sm:h-24 md:w-32 md:h-36 rounded-2xl md:rounded-[2.5rem] flex flex-col items-center justify-center transition-all duration-300 ${
-                                                    selectedDay === day.id ? 'bg-orange-500 text-white shadow-lg scale-105' : 'text-slate-300 hover:bg-slate-50'
-                                                }`}>
-                                                <span className={`text-[12px] md:text-[22px] font-black mb-1 opacity-90 ${selectedDay === day.id ? 'text-white' : 'text-slate-500'}`}>{day.dateStr}</span>
-                                                <span className="text-xl md:text-4xl font-black tracking-tighter">{day.label}</span>
-                                                {day.id === realDayOfWeek && <div className={`w-2 h-2 rounded-full mt-1.5 ${selectedDay === day.id ? 'bg-white' : 'bg-orange-400'}`} />}
-                                            </button>
-                                        ))}
-                                    </div>
-
-                                    <div className="scrollable-area no-scrollbar p-3 md:p-8 touch-pan-y bg-slate-50/50">
-                                        <div ref={kidListRef} className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-6 relative">
-                                            {currentTasks.length > 0 ? (
-                                                currentTasks.map((task) => (
-                                                    <div key={task.id} onClick={() => toggleItem(task.id)}
-                                                        className={`h-full cursor-pointer transition-all duration-300 origin-center ${teleportingCards[task.id] ? 'scale-50 opacity-0' : 'scale-100 opacity-100'}`}
-                                                    >
-                                                        <div className={`task-inner h-full border-2 p-5 md:p-8 rounded-[2rem] md:rounded-[3rem] flex items-center gap-4 transition-all duration-300 ${
-                                                            celebratingCards[task.id] 
-                                                                ? 'bg-white animate-happy-dance' 
-                                                                : checkedItems[task.id] && !teleportingCards[task.id]
-                                                                    ? 'bg-slate-100/60 border-slate-200/50 opacity-60'
-                                                                    : isFutureDate
-                                                                        ? 'bg-slate-50 border-transparent opacity-40 cursor-not-allowed' 
-                                                                        : 'bg-white border-slate-100 shadow-sm hover:shadow-md hover:border-orange-100' 
-                                                        }`}>
-                                                            <div className="flex-shrink-0 relative">
-                                                                {celebratingCards[task.id] && <MagicSparkles />}
-                                                                {checkedItems[task.id] ? (
-                                                                    <div className="bg-emerald-500 rounded-2xl p-4 shadow-lg animate-stamp relative z-10"><Icon name="CheckCircle2" className="w-8 h-8 text-white" /></div>
-                                                                ) : (
-                                                                    <div className="w-14 h-14 rounded-2xl border-[8px] transition-all duration-300 relative z-10 border-orange-50" />
+                                            <div className="p-2 md:p-4 max-w-2xl mx-auto">
+                                                <div className="grid grid-cols-7 gap-1 text-center mb-1">
+                                                    {['一','二','三','四','五','六','日'].map(d => <div key={d} className="text-[10px] font-bold text-slate-400">{d}</div>)}
+                                                </div>
+                                                <div className="grid grid-cols-7 gap-1 md:gap-2">
+                                                    {examCalendarData.data.map((day, idx) => (
+                                                        day ? (
+                                                            <div key={day.dateStr}
+                                                                 onClick={() => setSelectedExamDateStr(day.dateStr)}
+                                                                 className={`aspect-[4/3] flex flex-col items-center justify-center rounded-xl border relative transition-all cursor-pointer overflow-hidden
+                                                                 ${selectedExamDateStr === day.dateStr ? 'ring-2 ring-yellow-400 scale-105 z-10 bg-yellow-50 border-yellow-300' : 
+                                                                   day.exams.length > 0 ? 'bg-yellow-50/50 border-yellow-200 hover:bg-yellow-100' : 'bg-slate-50 border-slate-100 opacity-70'}
+                                                                 ${day.dateStr === getYYYYMMDD(realToday) && selectedExamDateStr !== day.dateStr ? 'border-yellow-400 border-2' : ''}`}>
+                                                                
+                                                                <span className={`text-[11px] md:text-sm font-black ${day.exams.length > 0 ? 'text-yellow-800' : 'text-slate-500'}`}>{day.date}</span>
+                                                                {day.exams.length > 0 && (
+                                                                    <div className="flex gap-0.5 mt-0.5">
+                                                                        {day.exams.slice(0,3).map((e,i)=><div key={i} className="w-1 h-1 md:w-1.5 md:h-1.5 rounded-full bg-yellow-500"></div>)}
+                                                                        {day.exams.length > 3 && <div className="w-1 h-1 md:w-1.5 md:h-1.5 rounded-full bg-yellow-500 opacity-50"></div>}
+                                                                    </div>
                                                                 )}
                                                             </div>
-                                                            <div className="flex-1 overflow-hidden text-left">
-                                                              <p className={`text-base sm:text-xl md:text-3xl font-black leading-snug tracking-tighter break-words transition-all duration-300 ${
-                                                                  checkedItems[task.id] && !celebratingCards[task.id] && !teleportingCards[task.id] ? 'text-slate-400' : 'text-slate-800'
-                                                              }`}>
-                                                                {task.title}
-                                                              </p>
+                                                        ) : <div key={`pad-${idx}`} className="aspect-[4/3]" />
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* 動態變色表頭 (只在作息表顯示) */}
+                                    {kidTab === 'tasks' && (
+                                        <div className="px-6 py-4 md:px-10 md:py-8 text-white relative flex-shrink-0 transition-colors duration-500 bg-gradient-to-r from-orange-400 to-rose-500 shadow-[0_5px_15px_rgba(0,0,0,0.05)] z-0">
+                                            <div className="flex justify-between items-start mb-4">
+                                               <div className="bg-white/20 px-4 py-1.5 rounded-xl shadow-sm flex items-center gap-2">
+                                                  <Icon name="Calendar" className="w-5 h-5 opacity-70" />
+                                                  <h2 className="text-lg md:text-2xl font-black tracking-tighter">{formattedDate}</h2>
+                                               </div>
+                                            </div>
+                                            
+                                            <div className="flex flex-row items-center justify-between gap-4">
+                                                <div className="flex-1">
+                                                    <h1 className="text-3xl sm:text-5xl md:text-7xl font-black tracking-tighter leading-tight mb-3 drop-shadow-sm">{greetingText}</h1>
+                                                    <div className="flex flex-col items-start gap-2">
+                                                        <p className="text-sm sm:text-lg font-bold bg-black/10 px-5 py-1.5 rounded-xl inline-flex items-center gap-2">
+                                                            {progress === 100 && currentTasks.length > 0 ? "🏆 完美的王者表現！" : `任務：${completedCount}/${currentTasks.length}`}
+                                                        </p>
+                                                        <p className="text-sm sm:text-base font-bold bg-white/20 px-4 py-1.5 rounded-xl inline-flex items-center gap-2 text-white border border-white/30">
+                                                            🔥 連續達標：{currentStreak} 天
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                                <div className="flex-shrink-0 w-24 h-24 sm:w-32 sm:h-32 md:w-40 md:h-40 aspect-square flex items-center justify-center bg-white/10 rounded-full border-[5px] border-white/20 shadow-lg relative overflow-hidden group">
+                                                    {progress === 100 ? (
+                                                        <div className="absolute inset-0 flex items-center justify-center z-10 animate-in zoom-in duration-500">
+                                                            <CustomNewTrophy color={dynamicColor} />
+                                                        </div>
+                                                    ) : (
+                                                        <span className="absolute inset-0 flex items-center justify-center text-3xl sm:text-5xl font-black z-10 text-white tracking-tighter">
+                                                            {progress}<span className="text-sm sm:text-lg ml-0.5 opacity-70">%</span>
+                                                        </span>
+                                                    )}
+                                                    <svg className="absolute inset-0 w-full h-full -rotate-90 p-0" viewBox="0 0 100 100">
+                                                        <circle cx="50" cy="50" r="44" fill="transparent" stroke="rgba(255,255,255,0.1)" strokeWidth="8" />
+                                                        <circle cx="50" cy="50" r="44" fill="transparent" stroke={dynamicColor} strokeWidth="8" strokeDasharray="276.46" strokeDashoffset={`${276.46 - (276.46 * progress / 100)}`} strokeLinecap="round" className="transition-all duration-1000 ease-in-out shadow-sm" />
+                                                    </svg>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    <div className="scrollable-area bg-slate-50 relative z-0 flex flex-col pt-2">
+                                        {kidTab === 'tasks' && (
+                                            <div className="p-3 md:p-8 touch-pan-y h-full">
+                                                <div ref={kidListRef} className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-6 relative pb-10">
+                                                    {currentTasks.length > 0 ? (
+                                                        currentTasks.map((task) => {
+                                                            const isChecked = checkedItems[task.id];
+                                                            return (
+                                                                <div key={task.id} onClick={() => toggleItem(task.id)}
+                                                                    className={`h-full cursor-pointer transition-all duration-300 origin-center ${teleportingCards[task.id] ? 'scale-50 opacity-0' : 'scale-100 opacity-100'}`}
+                                                                >
+                                                                    <div className={`task-inner h-full border-2 p-4 md:p-6 rounded-[1.5rem] md:rounded-[2.5rem] flex items-center gap-4 transition-all duration-300 ${
+                                                                        celebratingCards[task.id] 
+                                                                            ? 'bg-white animate-happy-dance' 
+                                                                            : isChecked && !teleportingCards[task.id]
+                                                                                ? 'bg-slate-100/60 border-slate-200/50 opacity-60'
+                                                                                : isFutureDate || selectedDay !== realDayOfWeek
+                                                                                    ? 'bg-slate-50 border-transparent opacity-40 cursor-not-allowed' 
+                                                                                    : 'bg-white border-slate-100 shadow-sm hover:shadow-md hover:border-orange-100' 
+                                                                    }`}>
+                                                                        <div className="flex-shrink-0 relative">
+                                                                            {celebratingCards[task.id] && <MagicSparkles />}
+                                                                            {isChecked ? (
+                                                                                <div className="bg-emerald-500 rounded-2xl p-3 md:p-4 shadow-lg animate-check-pop relative z-10"><Icon name="CheckCircle2" className="w-6 h-6 md:w-8 md:h-8 text-white" /></div>
+                                                                            ) : (
+                                                                                <div className="w-12 h-12 md:w-14 md:h-14 rounded-2xl border-[6px] md:border-[8px] transition-all duration-300 relative z-10 border-orange-50" />
+                                                                            )}
+                                                                        </div>
+                                                                        <div className="flex-1 overflow-hidden text-left">
+                                                                            <p className={`text-base sm:text-lg md:text-2xl font-black leading-snug tracking-tighter break-words transition-all duration-300 ${
+                                                                                isChecked && !celebratingCards[task.id] && !teleportingCards[task.id] ? 'text-slate-400' : 'text-slate-800'
+                                                                            }`}>
+                                                                            {task.title}
+                                                                            </p>
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                            );
+                                                        })
+                                                    ) : (
+                                                        <div className="col-span-full py-16 text-center opacity-30">
+                                                            <Icon name="Heart" className="w-16 h-16 text-yellow-500 mx-auto mb-4 animate-pulse" />
+                                                            <h3 className="text-2xl font-black tracking-tighter text-center">今日休息萬歲！🏖️</h3>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        )}
+                                        {kidTab === 'exams' && (
+                                            <div className="p-4 md:p-8">
+                                                {kidExamRewards.length > 0 && (
+                                                    <div className="mb-6 bg-gradient-to-r from-orange-50 to-yellow-100 border-2 border-yellow-300 rounded-2xl p-4 shadow-sm animate-bounce-fast">
+                                                        <h4 className="font-black text-orange-600 flex items-center gap-2 mb-2 text-lg"><Icon name="Gift"/> 恭喜！你有可以兌換的獎勵！</h4>
+                                                        {kidExamRewards.map(r => (
+                                                            <div key={r.periodId} className="bg-white/80 rounded-lg px-3 py-2 text-sm font-bold text-orange-800 mb-1 shadow-sm">
+                                                                👉 {r.label} {r.count > 1 && <span className="ml-1 text-red-500 font-black">(x{r.count})</span>}
                                                             </div>
+                                                        ))}
+                                                        <p className="text-sm text-orange-500 mt-2 font-bold">請找爸爸媽媽兌換禮物喔！🎁</p>
+                                                    </div>
+                                                )}
+                                                <div className="flex justify-between items-center mb-6 max-w-2xl mx-auto">
+                                                    <h3 className="text-xl md:text-3xl font-black text-slate-700 flex items-center gap-2 md:gap-3">
+                                                        <Icon name="Award" className="w-6 h-6 md:w-8 md:h-8 text-yellow-500" /> {selectedExamDateStr.split('-').slice(1).join('/')} 考試
+                                                    </h3>
+                                                    {selectedExamDateStr <= getYYYYMMDD(realToday) && (
+                                                        <button onClick={() => { setExamDate(selectedExamDateStr.replace(/\//g, "-")); setExamSubject(''); setExamType('平時考'); setExamUnitPrefix('單元'); setExamUnitNumber(''); setExamScore(''); setShowExamModal(true); }} className="bg-yellow-400 hover:bg-yellow-500 text-white px-4 py-2 md:px-5 md:py-3 rounded-2xl font-black shadow-md transition-transform active:scale-95 flex items-center gap-2 shrink-0">
+                                                            <Icon name="Plus" className="w-5 h-5" /> 記錄
+                                                        </button>
+                                                    )}
+                                                </div>
+                                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-2xl mx-auto pb-10">
+                                                    {activeExams.length > 0 ? (
+                                                        activeExams.map(exam => (
+                                                            <div key={exam.id} className="bg-white border-2 border-yellow-100 p-5 rounded-[2rem] flex justify-between items-center shadow-sm relative overflow-hidden group">
+                                                                <div className="absolute -right-4 -bottom-4 opacity-10 pointer-events-none"><Icon name="Award" className="w-32 h-32 text-yellow-600" /></div>
+                                                                <div>
+                                                                    <div className="flex items-center gap-2 mb-1">
+                                                                        <span className="text-[10px] bg-yellow-100 text-yellow-700 px-2 py-1 rounded font-bold">{exam.type}</span>
+                                                                    </div>
+                                                                    <span className="font-black text-slate-700 text-2xl relative z-10 flex items-baseline gap-2">
+                                                                        {exam.subject}
+                                                                        {exam.unit && <span className="text-lg text-slate-500 font-bold">{exam.unit}</span>}
+                                                                    </span>
+                                                                </div>
+                                                                <div className="flex flex-col items-end shrink-0">
+                                                                    <span className={`font-black text-4xl relative z-10 tabular-nums ${exam.score >= 90 ? 'text-red-500 drop-shadow-sm' : 'text-yellow-600'}`}>{exam.score}<span className="text-xl ml-1">分</span></span>
+                                                                    {exam.score === 100 && <span className="text-[10px] text-red-500 font-bold mt-1 bg-red-50 px-2 py-0.5 rounded-full border border-red-100 whitespace-nowrap">💯 完美滿分！</span>}
+                                                                    {exam.score >= 90 && exam.score < 100 && <span className="text-[10px] text-orange-500 font-bold mt-1 bg-orange-50 px-2 py-0.5 rounded-full border border-orange-100 whitespace-nowrap">🌟 表現優異！</span>}
+                                                                </div>
+                                                            </div>
+                                                        ))
+                                                    ) : (
+                                                        <div className="col-span-full py-12 text-center text-slate-400 font-bold bg-white rounded-3xl border-2 border-dashed border-slate-200 shadow-sm">
+                                                            <Icon name="Award" className="w-12 h-12 mx-auto mb-3 opacity-30 text-yellow-500" />
+                                                            此日沒有考試紀錄喔！
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        )}
+                                        {kidTab === 'calendar' && (
+                                            <div className="p-4 md:p-8 w-full flex flex-col items-center">
+                                                <div className="w-full max-w-3xl bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                                                    <div className="bg-emerald-50 border-b border-emerald-100 px-4 py-3 flex justify-between items-center">
+                                                        <h3 className="font-black flex items-center gap-2 text-emerald-700"><Icon name="Calendar" className="w-5 h-5"/>家庭行事曆</h3>
+                                                        <div className="flex items-center gap-3 bg-white px-2 py-1 rounded-lg border shadow-sm border-emerald-100">
+                                                            <button onClick={() => {setParentMonthOffset(p => p - 1); setSelectedLogDateStr(null);}} className="p-1 rounded text-emerald-600 hover:bg-emerald-50"><Icon name="ChevronLeft" className="w-5 h-5"/></button>
+                                                            <span className="font-bold text-sm w-20 text-center text-slate-700">{parentCalendarData.year} / {String(parentCalendarData.month).padStart(2, '0')}</span>
+                                                            <button onClick={() => {setParentMonthOffset(p => p + 1); setSelectedLogDateStr(null);}} className="p-1 rounded text-emerald-600 hover:bg-emerald-50"><Icon name="ChevronRight" className="w-5 h-5"/></button>
                                                         </div>
                                                     </div>
-                                                ))
-                                            ) : (
-                                                <div className="col-span-full py-16 text-center opacity-30">
-                                                    <Icon name="Heart" className="w-16 h-16 text-yellow-500 mx-auto mb-4 animate-pulse" />
-                                                    <h3 className="text-2xl font-black tracking-tighter text-center">今日休息萬歲！🏖️</h3>
+                                                    <div className="p-2 md:p-4">
+                                                        <div className="grid grid-cols-7 gap-1 text-center mb-2">
+                                                            {['一','二','三','四','五','六','日'].map(d => <div key={d} className="text-xs font-bold text-slate-400">{d}</div>)}
+                                                        </div>
+                                                        <div className="grid grid-cols-7 gap-1 md:gap-2">
+                                                            {parentCalendarData.data.map((day, idx) => (
+                                                                day ? (
+                                                                    <div key={day.dateStr}
+                                                                         onClick={() => { setSelectedEventDate(day.dateStr); setShowEventModal(true); }}
+                                                                         className={`aspect-[4/3] flex flex-col items-center justify-start py-1 rounded-xl border relative transition-all cursor-pointer hover:shadow-md 
+                                                                         bg-slate-50 hover:bg-emerald-50 hover:border-emerald-200 overflow-hidden
+                                                                         ${day.dateStr === getYYYYMMDD(realToday) ? 'bg-yellow-50 border-yellow-400 border-2 shadow-sm' : 'border-slate-100'}`}>
+                                                                        <span className={`text-xs md:text-sm font-black ${day.dateStr === getYYYYMMDD(realToday) ? 'text-yellow-700' : 'text-slate-600'}`}>{day.date}</span>
+                                                                        {day.events && day.events.length > 0 && (
+                                                                            <div className="flex flex-col gap-0.5 mt-1 w-full px-0.5 md:px-1">
+                                                                                {day.events.slice(0, 2).map((e, i) => (
+                                                                                    <div key={i} className={`text-[8px] md:text-[10px] leading-tight truncate w-full px-1 py-0.5 rounded shadow-sm font-bold ${EVENT_TYPES[e.type].color}`}>
+                                                                                        {EVENT_TYPES[e.type].label}: {e.title}
+                                                                                    </div>
+                                                                                ))}
+                                                                                {day.events.length > 2 && <div className="text-[8px] text-slate-400 font-bold">+{day.events.length - 2}</div>}
+                                                                            </div>
+                                                                        )}
+                                                                    </div>
+                                                                ) : <div key={`pad-${idx}`} className="aspect-[4/3]" />
+                                                            ))}
+                                                        </div>
+                                                    </div>
                                                 </div>
-                                            )}
-                                        </div>
+                                                <div className="w-full max-w-3xl mx-auto mt-4 p-4 border border-slate-200 bg-white rounded-2xl shadow-sm">
+                                                    <div className="flex justify-between items-center mb-3">
+                                                        <h4 className="text-sm font-black text-slate-500 flex items-center gap-2"><Icon name="ListTodo" className="w-4 h-4"/> 當月事件清單</h4>
+                                                    </div>
+                                                    <div className="space-y-2">
+                                                        {parentCalendarData.data.filter(d => d && d.events.length > 0).map(d => d.events).flat().length > 0 ? (
+                                                            parentCalendarData.data.filter(d => d && d.events.length > 0).map(d => d.events).flat().sort((a,b) => a.dateStr.localeCompare(b.dateStr)).map(e => (
+                                                                <div key={e.id} className={`flex items-center gap-3 p-3 rounded-xl border ${EVENT_TYPES[e.type].color}`}>
+                                                                    <span className="text-xs font-black px-2 py-1 rounded bg-white/70 shadow-sm shrink-0">{e.dateStr.substring(5)}</span>
+                                                                    <span className="text-xs font-black px-2 py-1 rounded bg-white/70 shadow-sm shrink-0">{EVENT_TYPES[e.type].label}</span>
+                                                                    <span className="font-bold text-sm flex-1">{e.title}</span>
+                                                                </div>
+                                                            ))
+                                                        ) : (
+                                                            <div className="text-center text-slate-400 font-bold py-4 text-sm bg-slate-50 rounded-xl border border-dashed border-slate-200">本月無事件</div>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
                                     </div>
-                                </>
+                                </div>
                             )}
 
-                            {/* 皇室管理模式 */}
-                            {mode === 'parent' && (
-                                <div className="flex flex-col h-full bg-indigo-50/30 relative">
+                            {/* 皇室管理模式內容 (已驗證) */}
+                            {mode === 'parent' && isParentAuth && (
+                                <div className="flex flex-col h-full relative">
                                     <div className="bg-slate-800 px-6 py-4 md:px-8 md:py-6 text-white shrink-0 flex items-center justify-between z-20 shadow-md">
                                         <div>
                                             <div className="flex items-center gap-2 mb-1">
@@ -1043,26 +1630,34 @@
                                         </div>
                                     </div>
 
-                                    <div className="flex px-4 md:px-6 pt-4 gap-2 border-b border-indigo-200 z-10 relative bg-slate-50 shrink-0">
+                                    <div className="flex px-4 md:px-6 pt-4 gap-1 z-10 relative bg-slate-100 shrink-0 overflow-x-auto no-scrollbar shadow-[0_2px_5px_rgba(0,0,0,0.02)] items-end">
                                         <button onClick={() => setParentTab('log')}
-                                            className={`flex-1 max-w-[140px] px-2 py-3 rounded-t-xl font-black text-sm md:text-base transition-all ${parentTab === 'log' ? 'bg-white text-indigo-700 shadow-[0_-4px_10px_rgba(0,0,0,0.05)] translate-y-[1px]' : 'bg-indigo-100 text-indigo-400 hover:bg-indigo-200 hover:text-indigo-600 border-b border-indigo-200'}`}>
-                                            月曆補登
-                                        </button>
-                                        <button onClick={() => setParentTab('rewards')}
-                                            className={`flex-1 max-w-[140px] px-2 py-3 rounded-t-xl font-black text-sm md:text-base transition-all ${parentTab === 'rewards' ? 'bg-white text-indigo-700 shadow-[0_-4px_10px_rgba(0,0,0,0.05)] translate-y-[1px]' : 'bg-indigo-100 text-indigo-400 hover:bg-indigo-200 hover:text-indigo-600 border-b border-indigo-200'}`}>
-                                            獎勵紀錄
+                                            className={`relative px-4 py-2.5 md:px-6 md:py-3 font-black text-sm transition-all duration-300 ease-in-out border border-b-0 rounded-t-2xl shrink-0 ${parentTab === 'log' ? 'bg-white text-indigo-700 shadow-[0_-5px_15px_rgba(0,0,0,0.05)] z-20 pb-4 -mb-1' : 'bg-slate-200/70 text-slate-500 hover:bg-slate-200 z-10 border-slate-300'}`}>
+                                            作息表補登
                                         </button>
                                         <button onClick={() => setParentTab('manage')}
-                                            className={`flex-1 max-w-[140px] px-2 py-3 rounded-t-xl font-black text-sm md:text-base transition-all ${parentTab === 'manage' ? 'bg-white text-indigo-700 shadow-[0_-4px_10px_rgba(0,0,0,0.05)] translate-y-[1px]' : 'bg-indigo-100 text-indigo-400 hover:bg-indigo-200 hover:text-indigo-600 border-b border-indigo-200'}`}>
+                                            className={`relative px-4 py-2.5 md:px-6 md:py-3 font-black text-sm transition-all duration-300 ease-in-out border border-b-0 rounded-t-2xl shrink-0 ${parentTab === 'manage' ? 'bg-white text-indigo-700 shadow-[0_-5px_15px_rgba(0,0,0,0.05)] z-20 pb-4 -mb-1' : 'bg-slate-200/70 text-slate-500 hover:bg-slate-200 z-10 border-slate-300'}`}>
                                             作息維護
+                                        </button>
+                                        <button onClick={() => setParentTab('calendar')}
+                                            className={`relative px-4 py-2.5 md:px-6 md:py-3 font-black text-sm transition-all duration-300 ease-in-out border border-b-0 rounded-t-2xl shrink-0 ${parentTab === 'calendar' ? 'bg-white text-indigo-700 shadow-[0_-5px_15px_rgba(0,0,0,0.05)] z-20 pb-4 -mb-1' : 'bg-slate-200/70 text-slate-500 hover:bg-slate-200 z-10 border-slate-300'}`}>
+                                            行事曆
+                                        </button>
+                                        <button onClick={() => setParentTab('exams')}
+                                            className={`relative px-4 py-2.5 md:px-6 md:py-3 font-black text-sm transition-all duration-300 ease-in-out border border-b-0 rounded-t-2xl shrink-0 ${parentTab === 'exams' ? 'bg-white text-indigo-700 shadow-[0_-5px_15px_rgba(0,0,0,0.05)] z-20 pb-4 -mb-1' : 'bg-slate-200/70 text-slate-500 hover:bg-slate-200 z-10 border-slate-300'}`}>
+                                            考試設定/紀錄
+                                        </button>
+                                        <button onClick={() => setParentTab('rewards')}
+                                            className={`relative px-4 py-2.5 md:px-6 md:py-3 font-black text-sm transition-all duration-300 ease-in-out border border-b-0 rounded-t-2xl shrink-0 ${parentTab === 'rewards' ? 'bg-white text-indigo-700 shadow-[0_-5px_15px_rgba(0,0,0,0.05)] z-20 pb-4 -mb-1' : 'bg-slate-200/70 text-slate-500 hover:bg-slate-200 z-10 border-slate-300'}`}>
+                                            獎勵設定/紀錄
                                         </button>
                                     </div>
 
-                                    <div className="bg-white flex-1 rounded-b-2xl md:rounded-b-[3.5rem] shadow-inner overflow-y-auto p-4 md:p-6 -mt-px relative z-0">
+                                    <div className="scrollable-area bg-white shadow-inner p-4 md:p-6 relative z-0 border-t-2 border-slate-200 pb-20">
                                         
-                                        {/* 分頁 1：月曆補登 */}
+                                        {/* 分頁 1：作息表補登 */}
                                         {parentTab === 'log' && (
-                                            <div className="max-w-2xl mx-auto space-y-4">
+                                            <div className="max-w-3xl mx-auto space-y-4">
                                                 <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
                                                     <div className="bg-indigo-50/50 px-4 py-3 border-b border-indigo-100 flex justify-between items-center">
                                                         <h3 className="font-black text-indigo-900 flex items-center gap-2"><Icon name="Calendar" className="w-5 h-5"/>進度補登</h3>
@@ -1072,7 +1667,7 @@
                                                             <button onClick={() => {setParentMonthOffset(p => p + 1); setSelectedLogDateStr(null);}} className="p-1 hover:bg-indigo-50 rounded text-indigo-600"><Icon name="ChevronRight" className="w-5 h-5"/></button>
                                                         </div>
                                                     </div>
-                                                    <div className="p-4">
+                                                    <div className="p-2 md:p-4">
                                                         <div className="grid grid-cols-7 gap-1 text-center mb-2">
                                                             {['一','二','三','四','五','六','日'].map(d => <div key={d} className="text-xs font-bold text-slate-400">{d}</div>)}
                                                         </div>
@@ -1081,11 +1676,11 @@
                                                                 day ? (
                                                                     <div key={day.dateStr}
                                                                          onClick={() => setSelectedLogDateStr(day.dateStr === selectedLogDateStr ? null : day.dateStr)}
-                                                                         className={`aspect-[4/3] flex flex-col items-center justify-center rounded-xl border relative transition-all cursor-pointer hover:shadow-md 
+                                                                         className={`aspect-[4/3] flex flex-col items-center justify-center rounded-xl border relative transition-all cursor-pointer hover:shadow-md overflow-hidden
                                                                          ${selectedLogDateStr === day.dateStr ? 'ring-4 ring-indigo-400 scale-105 z-10 bg-indigo-50 border-indigo-300' : 
                                                                            day.uncompleted > 0 ? 'bg-red-50 border-red-200 hover:bg-red-100' : 
                                                                            day.total > 0 ? 'bg-emerald-50 border-emerald-100 opacity-80 hover:opacity-100' : 'bg-slate-50 border-slate-100 opacity-50'}
-                                                                         ${day.dateStr === getYYYYMMDD(realToday) && selectedLogDateStr !== day.dateStr ? 'border-indigo-400 border-2' : ''}`}>
+                                                                         ${day.dateStr === getYYYYMMDD(realToday) && selectedLogDateStr !== day.dateStr ? 'bg-yellow-50 border-yellow-400 border-2' : ''}`}>
                                                                         
                                                                         <span className={`text-sm md:text-base font-black ${day.uncompleted > 0 ? 'text-red-900' : 'text-slate-500'}`}>{day.date}</span>
                                                                         {day.uncompleted > 0 && (
@@ -1094,7 +1689,7 @@
                                                                             </span>
                                                                         )}
                                                                         {day.uncompleted === 0 && day.total > 0 && (
-                                                                            <div className="absolute inset-0 flex items-center justify-center bg-emerald-50/60 rounded-xl">
+                                                                            <div className="absolute inset-0 flex items-center justify-center bg-emerald-50/60 rounded-xl pointer-events-none">
                                                                                 <Icon name="CheckCircle2" className="w-8 h-8 md:w-10 md:h-10 text-emerald-500 drop-shadow-sm" strokeWidth={3} />
                                                                             </div>
                                                                         )}
@@ -1107,12 +1702,12 @@
                                                 </div>
 
                                                 {selectedLogDayObj && (
-                                                    <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 md:p-6 shadow-inner relative animate-slide-down">
+                                                    <div className="bg-white border border-slate-200 rounded-2xl p-4 md:p-6 shadow-md relative animate-slide-down">
                                                         <div className="flex justify-between items-center mb-4 border-b border-slate-200 pb-2">
                                                             <h4 className="font-black text-indigo-900 text-lg flex items-center gap-2">
                                                                 <Icon name="Calendar" className="w-5 h-5 text-indigo-500"/> {selectedLogDayObj.dateStr} 任務清單
                                                             </h4>
-                                                            <button onClick={() => setSelectedLogDateStr(null)} className="text-slate-400 hover:text-slate-600 bg-white border border-slate-200 rounded-full w-8 h-8 flex items-center justify-center shadow-sm"><Icon name="X" className="w-5 h-5"/></button>
+                                                            <button onClick={() => setSelectedLogDateStr(null)} className="text-slate-400 hover:text-slate-600 bg-slate-50 border border-slate-200 rounded-full w-8 h-8 flex items-center justify-center shadow-sm"><Icon name="X" className="w-5 h-5"/></button>
                                                         </div>
                                                         
                                                         <div ref={logListRef} className="space-y-2">
@@ -1124,7 +1719,7 @@
                                                                         <div key={task.id} onClick={() => !isAnimating && handleLogTask(task.id, selectedLogDayObj)}
                                                                              className={`p-3 md:p-4 border-2 rounded-xl flex items-center justify-between cursor-pointer transition-all shadow-sm ${
                                                                                  isChecked 
-                                                                                 ? (isAnimating === 'unchecking' ? 'bg-red-50 border-red-300 scale-[0.98]' : 'border-slate-200 bg-slate-50/50 opacity-60 hover:opacity-100 hover:bg-slate-100 active:scale-95') 
+                                                                                 ? (isAnimating === 'unchecking' ? 'bg-red-50 border-red-300 scale-[0.98]' : 'border-slate-200 bg-slate-50 opacity-60 hover:opacity-100 hover:bg-slate-100 active:scale-95') 
                                                                                  : (isAnimating === 'checking' ? 'bg-emerald-50 border-emerald-300 scale-[0.98]' : 'border-red-200 bg-white hover:bg-red-50 hover:border-red-300 active:scale-95')
                                                                              }`}>
                                                                             <span className={`font-bold transition-colors ${isChecked && !isAnimating ? 'text-slate-500 line-through' : 'text-slate-800'}`}>{task.title}</span>
@@ -1151,9 +1746,229 @@
                                             </div>
                                         )}
 
-                                        {/* 分頁 2：獎品紀錄 */}
+                                        {/* 分頁 2：行事曆管理 */}
+                                        {parentTab === 'calendar' && (
+                                            <div className="max-w-3xl mx-auto space-y-4">
+                                                <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                                                    <div className="bg-emerald-50 px-4 py-3 border-b border-emerald-100 flex justify-between items-center">
+                                                        <h3 className="font-black flex items-center gap-2 text-emerald-700"><Icon name="Calendar" className="w-5 h-5"/>家庭行事曆</h3>
+                                                        <div className="flex items-center gap-3 bg-white px-2 py-1 rounded-lg border shadow-sm border-emerald-100">
+                                                            <button onClick={() => setParentMonthOffset(p => p - 1)} className="p-1 rounded text-emerald-600 hover:bg-emerald-50"><Icon name="ChevronLeft" className="w-5 h-5"/></button>
+                                                            <span className="font-bold text-sm w-20 text-center text-slate-700">{parentCalendarData.year} / {String(parentCalendarData.month).padStart(2, '0')}</span>
+                                                            <button onClick={() => setParentMonthOffset(p => p + 1)} className="p-1 rounded text-emerald-600 hover:bg-emerald-50"><Icon name="ChevronRight" className="w-5 h-5"/></button>
+                                                        </div>
+                                                    </div>
+                                                    <div className="p-2 md:p-4">
+                                                        <div className="grid grid-cols-7 gap-1 text-center mb-2">
+                                                            {['一','二','三','四','五','六','日'].map(d => <div key={d} className="text-xs font-bold text-slate-400">{d}</div>)}
+                                                        </div>
+                                                        <div className="grid grid-cols-7 gap-1 md:gap-2">
+                                                            {parentCalendarData.data.map((day, idx) => (
+                                                                day ? (
+                                                                    <div key={day.dateStr}
+                                                                         onClick={() => { setSelectedEventDate(day.dateStr); setShowEventModal(true); }}
+                                                                         className={`aspect-[4/3] flex flex-col items-center justify-start py-1 rounded-xl border relative transition-all cursor-pointer hover:shadow-md 
+                                                                         bg-slate-50 hover:bg-emerald-50 hover:border-emerald-200 overflow-hidden
+                                                                         ${day.dateStr === getYYYYMMDD(realToday) ? 'bg-yellow-50 border-yellow-400 border-2 shadow-sm' : 'border-slate-100'}`}>
+                                                                        <span className={`text-xs md:text-sm font-black ${day.dateStr === getYYYYMMDD(realToday) ? 'text-yellow-700' : 'text-slate-600'}`}>{day.date}</span>
+                                                                        {day.events && day.events.length > 0 && (
+                                                                            <div className="flex flex-col gap-0.5 mt-1 w-full px-0.5 md:px-1">
+                                                                                {day.events.slice(0, 2).map((e, i) => (
+                                                                                    <div key={i} className={`text-[8px] md:text-[10px] leading-tight truncate w-full px-1 py-0.5 rounded shadow-sm font-bold ${EVENT_TYPES[e.type].color}`}>
+                                                                                        {EVENT_TYPES[e.type].label}: {e.title}
+                                                                                    </div>
+                                                                                ))}
+                                                                                {day.events.length > 2 && <div className="text-[8px] text-slate-400 font-bold">+{day.events.length - 2}</div>}
+                                                                            </div>
+                                                                        )}
+                                                                    </div>
+                                                                ) : <div key={`pad-${idx}`} className="aspect-[4/3]" />
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <div className="w-full bg-white rounded-2xl shadow-sm border border-slate-200 p-4 mt-4">
+                                                    <div className="flex justify-between items-center mb-3">
+                                                        <h4 className="text-sm font-black text-slate-500 flex items-center gap-2"><Icon name="ListTodo" className="w-4 h-4"/> 當月事件清單</h4>
+                                                        <button onClick={() => { setSelectedEventDate(getYYYYMMDD(realToday)); setShowEventModal(true); }} className="text-xs bg-indigo-100 text-indigo-600 px-2 py-1 rounded font-bold hover:bg-indigo-200">
+                                                            + 新增
+                                                        </button>
+                                                    </div>
+                                                    <div className="space-y-2">
+                                                        {parentCalendarData.data.filter(d => d && d.events.length > 0).map(d => d.events).flat().length > 0 ? (
+                                                            parentCalendarData.data.filter(d => d && d.events.length > 0).map(d => d.events).flat().sort((a,b) => a.dateStr.localeCompare(b.dateStr)).map(e => (
+                                                                <div key={e.id} className={`flex items-center gap-3 p-3 rounded-xl border ${EVENT_TYPES[e.type].color}`}>
+                                                                    <span className="text-xs font-black px-2 py-1 rounded bg-white/70 shadow-sm shrink-0">{e.dateStr.substring(5)}</span>
+                                                                    <span className="text-xs font-black px-2 py-1 rounded bg-white/70 shadow-sm shrink-0">{EVENT_TYPES[e.type].label}</span>
+                                                                    <span className="font-bold text-sm flex-1">{e.title}</span>
+                                                                    <button onClick={() => { const updated = events.filter(ev => ev.id !== e.id); setEvents(updated); robustSave(STORAGE_KEYS.EVENTS, STORAGE_KEYS.EVENTS + '_bak', updated); playSound('uncheck'); }} className="p-1.5 hover:bg-white/50 rounded-lg shrink-0"><Icon name="Trash2" className="w-4 h-4" /></button>
+                                                                </div>
+                                                            ))
+                                                        ) : (
+                                                            <div className="text-center text-slate-400 font-bold py-4 text-sm bg-slate-50 rounded-xl border border-dashed border-slate-200">本月無事件</div>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {/* 分頁 3：考試紀錄管理 */}
+                                        {parentTab === 'exams' && (
+                                            <div className="max-w-4xl mx-auto space-y-6">
+                                                
+                                                <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+                                                    <h3 className="font-black text-slate-700 flex items-center gap-2 mb-4 border-b pb-2"><Icon name="Settings2" className="w-5 h-5"/>考試科目與種類設定</h3>
+                                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                                        <div>
+                                                            <label className="block text-sm font-bold text-slate-500 mb-2">考試種類</label>
+                                                            <div className="flex gap-2 mb-2">
+                                                                <input value={newTypeInput} onChange={e=>setNewTypeInput(e.target.value)} onKeyDown={e=>e.key==='Enter' && handleAddType()} placeholder="新增種類" className="flex-1 text-sm border rounded-lg px-3 py-1.5 outline-none focus:border-indigo-400 font-bold" />
+                                                                <button onClick={handleAddType} className="bg-indigo-100 text-indigo-600 px-3 py-1.5 rounded-lg font-bold text-sm hover:bg-indigo-200">新增</button>
+                                                            </div>
+                                                            <div className="flex flex-wrap gap-2">
+                                                                {examTypes.map(t => (
+                                                                    <div key={t} className="bg-slate-100 text-slate-600 px-2 py-1 rounded text-xs font-bold flex items-center gap-1">
+                                                                        {t} <button onClick={() => handleDeleteType(t)} className="text-slate-400 hover:text-red-500"><Icon name="X" className="w-3 h-3"/></button>
+                                                                    </div>
+                                                                ))}
+                                                            </div>
+                                                        </div>
+                                                        <div>
+                                                            <label className="block text-sm font-bold text-slate-500 mb-2">考試科目</label>
+                                                            <div className="flex gap-2 mb-2">
+                                                                <input value={newSubjectInput} onChange={e=>setNewSubjectInput(e.target.value)} onKeyDown={e=>e.key==='Enter' && handleAddSubject()} placeholder="新增科目" className="flex-1 text-sm border rounded-lg px-3 py-1.5 outline-none focus:border-indigo-400 font-bold" />
+                                                                <button onClick={handleAddSubject} className="bg-indigo-100 text-indigo-600 px-3 py-1.5 rounded-lg font-bold text-sm hover:bg-indigo-200">新增</button>
+                                                            </div>
+                                                            <div className="flex flex-wrap gap-2">
+                                                                {examSubjects.map(s => (
+                                                                    <div key={s} className="bg-yellow-50 text-yellow-700 border border-yellow-200 px-2 py-1 rounded text-xs font-bold flex items-center gap-1">
+                                                                        {s} <button onClick={() => handleDeleteSubject(s)} className="text-yellow-400 hover:text-red-500"><Icon name="X" className="w-3 h-3"/></button>
+                                                                    </div>
+                                                                ))}
+                                                            </div>
+                                                        </div>
+                                                        <div>
+                                                            <label className="block text-sm font-bold text-slate-500 mb-2">考試單元/範圍</label>
+                                                            <div className="flex gap-2 mb-2">
+                                                                <input value={newUnitInput} onChange={e=>setNewUnitInput(e.target.value)} onKeyDown={e=>e.key==='Enter' && handleAddUnit()} placeholder="新增單位(如:章)" className="flex-1 text-sm border rounded-lg px-3 py-1.5 outline-none focus:border-indigo-400 font-bold" />
+                                                                <button onClick={handleAddUnit} className="bg-indigo-100 text-indigo-600 px-3 py-1.5 rounded-lg font-bold text-sm hover:bg-indigo-200">新增</button>
+                                                            </div>
+                                                            <div className="flex flex-wrap gap-2">
+                                                                {examUnits.map(u => (
+                                                                    <div key={u} className="bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-1 rounded text-xs font-bold flex items-center gap-1">
+                                                                        {u} <button onClick={() => handleDeleteUnit(u)} className="text-emerald-400 hover:text-red-500"><Icon name="X" className="w-3 h-3"/></button>
+                                                                    </div>
+                                                                ))}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                <div className="bg-indigo-50 p-5 rounded-2xl border border-indigo-100 shadow-sm">
+                                                    <h3 className="font-black text-indigo-900 flex items-center gap-2 mb-4 border-b border-indigo-200 pb-2"><Icon name="Gift" className="w-5 h-5"/>考試自動獎勵規則</h3>
+                                                    <div className="flex flex-wrap gap-2 mb-4 items-end">
+                                                        <div>
+                                                            <label className="text-xs font-bold text-indigo-400 block mb-1">種類</label>
+                                                            <select value={newRuleType} onChange={e=>setNewRuleType(e.target.value)} className="block w-24 p-2 rounded-lg border outline-none font-bold text-sm bg-white">
+                                                                <option value="不限">不限</option>{examTypes.map(t=><option key={t} value={t}>{t}</option>)}
+                                                            </select>
+                                                        </div>
+                                                        <div>
+                                                            <label className="text-xs font-bold text-indigo-400 block mb-1">科目</label>
+                                                            <select value={newRuleSubject} onChange={e=>setNewRuleSubject(e.target.value)} className="block w-24 p-2 rounded-lg border outline-none font-bold text-sm bg-white">
+                                                                <option value="不限">不限</option>{examSubjects.map(s=><option key={s} value={s}>{s}</option>)}
+                                                            </select>
+                                                        </div>
+                                                        <div>
+                                                            <label className="text-xs font-bold text-indigo-400 block mb-1">達標分數</label>
+                                                            <input type="number" value={newRuleScore} onChange={e=>setNewRuleScore(e.target.value)} placeholder="如:90" className="block w-20 p-2 rounded-lg border outline-none font-bold text-sm bg-white" />
+                                                        </div>
+                                                        <div>
+                                                            <label className="text-xs font-bold text-indigo-400 block mb-1">累積次數</label>
+                                                            <input type="number" value={newRuleCount} onChange={e=>setNewRuleCount(e.target.value)} placeholder="如:2" className="block w-20 p-2 rounded-lg border outline-none font-bold text-sm bg-white" />
+                                                        </div>
+                                                        <div className="flex-1 min-w-[150px]">
+                                                            <label className="text-xs font-bold text-indigo-400 block mb-1">可兌換獎勵名稱 (作為預設值)</label>
+                                                            <input type="text" value={newRuleRewardName} onChange={e=>setNewRuleRewardName(e.target.value)} placeholder="如: 樂高玩具" className="block w-full p-2 rounded-lg border outline-none font-bold text-sm bg-white" />
+                                                        </div>
+                                                        <button onClick={() => {
+                                                            if(!newRuleScore || !newRuleCount) return;
+                                                            const newRule = { id: Date.now().toString(), type: newRuleType, subject: newRuleSubject, minScore: parseInt(newRuleScore), requiredCount: parseInt(newRuleCount), rewardName: newRuleRewardName || '考試獎勵' };
+                                                            const updated = [...examRules, newRule];
+                                                            setExamRules(updated); robustSave(STORAGE_KEYS.EXAM_RULES, STORAGE_KEYS.EXAM_RULES+'_bak', updated);
+                                                            setNewRuleScore(''); setNewRuleCount(''); setNewRuleRewardName('');
+                                                        }} className="bg-indigo-600 text-white px-4 py-2 rounded-lg font-bold hover:bg-indigo-700">新增規則</button>
+                                                    </div>
+                                                    <div className="space-y-2">
+                                                        {examRules.map(r => (
+                                                            <div key={r.id} className="bg-white p-3 rounded-lg border flex justify-between items-center text-sm font-bold shadow-sm">
+                                                                <span className="text-slate-600"><span className="text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded mr-1">{r.type === '不限' ? '任何考試' : r.type}</span> <span className="text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded mr-1">{r.subject === '不限' ? '任何科目' : r.subject}</span> 達 <span className="text-red-500">{r.minScore}</span> 分，累積滿 <span className="text-red-500">{r.requiredCount}</span> 次 ➔ 預設獎品：<span className="text-indigo-600">{r.rewardName}</span></span>
+                                                                <button onClick={() => { const updated = examRules.filter(er => er.id !== r.id); setExamRules(updated); robustSave(STORAGE_KEYS.EXAM_RULES, STORAGE_KEYS.EXAM_RULES+'_bak', updated); }} className="text-slate-400 hover:text-red-500"><Icon name="Trash2" className="w-4 h-4"/></button>
+                                                            </div>
+                                                        ))}
+                                                        {examRules.length === 0 && <div className="text-sm font-bold text-indigo-300">尚未設定任何考試獎勵規則。</div>}
+                                                    </div>
+                                                </div>
+
+                                                <div className="space-y-4">
+                                                    <h3 className="font-black text-slate-700 flex items-center gap-2 mb-2 border-b pb-2"><Icon name="ListTodo" className="w-5 h-5"/>歷史考試成績總覽</h3>
+                                                    {exams.length > 0 ? (
+                                                        exams.sort((a,b) => b.dateStr.localeCompare(a.dateStr) || b.id.localeCompare(a.id)).map(e => {
+                                                            const isEditing = editingExamId === e.id;
+                                                            return (
+                                                                <div key={e.id} className="bg-white border border-slate-200 p-4 md:p-5 rounded-xl shadow-sm hover:border-yellow-300 transition-colors group">
+                                                                    {isEditing ? (
+                                                                        <div className="flex flex-wrap gap-2 items-center bg-yellow-50 p-3 rounded-lg">
+                                                                            <input type="date" value={editExamDate} onChange={ev=>setEditExamDate(ev.target.value)} className="p-1.5 rounded border text-sm font-bold" />
+                                                                            <select value={editExamType} onChange={ev=>setEditExamType(ev.target.value)} className="p-1.5 rounded border text-sm font-bold"><option value="">種類</option>{examTypes.map(t=><option key={t} value={t}>{t}</option>)}</select>
+                                                                            <select value={editExamSubject} onChange={ev=>setEditExamSubject(ev.target.value)} className="p-1.5 rounded border text-sm font-bold"><option value="">科目</option>{examSubjects.map(s=><option key={s} value={s}>{s}</option>)}</select>
+                                                                            <input type="text" value={editExamUnit} onChange={ev=>setEditExamUnit(ev.target.value)} placeholder="單元/範圍" className="p-1.5 w-24 rounded border text-sm font-bold" />
+                                                                            <input type="number" value={editExamScore} onChange={ev=>setEditExamScore(ev.target.value)} className="p-1.5 w-16 rounded border text-sm font-bold text-center" />
+                                                                            <button onClick={() => {
+                                                                                let scoreNum = parseInt(editExamScore, 10); if(isNaN(scoreNum)) scoreNum=0;
+                                                                                const updated = exams.map(ex => ex.id === e.id ? {...ex, dateStr: editExamDate, type: editExamType, subject: editExamSubject, unit: editExamUnit, score: scoreNum} : ex);
+                                                                                setExams(updated); robustSave(STORAGE_KEYS.EXAMS, STORAGE_KEYS.EXAMS+'_bak', updated); setEditingExamId(null);
+                                                                            }} className="bg-indigo-500 text-white px-3 py-1.5 rounded text-sm font-bold ml-auto">儲存</button>
+                                                                            <button onClick={() => setEditingExamId(null)} className="bg-slate-200 text-slate-600 px-3 py-1.5 rounded text-sm font-bold">取消</button>
+                                                                        </div>
+                                                                    ) : (
+                                                                        <div className="flex items-center justify-between">
+                                                                            <div className="flex items-center gap-4">
+                                                                                <div className={`w-12 h-12 rounded-full flex items-center justify-center border-2 shrink-0 ${e.score >= 90 ? 'bg-red-50 border-red-200 text-red-500' : 'bg-yellow-50 border-yellow-200 text-yellow-600'}`}>
+                                                                                    <Icon name="Award" className="w-6 h-6" />
+                                                                                </div>
+                                                                                <div>
+                                                                                    <div className="flex items-center gap-2 mb-1">
+                                                                                        <span className="text-[10px] bg-slate-100 text-slate-500 px-2 py-0.5 rounded font-bold">{e.type}</span>
+                                                                                        {e.unit && <span className="text-[10px] bg-indigo-50 text-indigo-500 border border-indigo-100 px-2 py-0.5 rounded font-bold">{e.unit}</span>}
+                                                                                    </div>
+                                                                                    <p className="font-black text-slate-800 text-lg flex items-baseline gap-2">
+                                                                                        {e.subject} <span className={`text-2xl ${e.score >= 90 ? 'text-red-500' : 'text-yellow-600'}`}>{e.score}分</span>
+                                                                                    </p>
+                                                                                    <p className="text-xs text-slate-400 font-bold flex items-center gap-1 mt-1"><Icon name="Calendar" className="w-3 h-3"/> 考試日期：{e.dateStr}</p>
+                                                                                </div>
+                                                                            </div>
+                                                                            <div className="flex gap-1">
+                                                                                <button onClick={() => {setEditingExamId(e.id); setEditExamDate(e.dateStr); setEditExamType(e.type); setEditExamSubject(e.subject); setEditExamUnit(e.unit || ''); setEditExamScore(e.score);}} className="p-2 text-slate-300 hover:text-indigo-500 hover:bg-indigo-50 rounded-lg transition-all opacity-100 md:opacity-0 group-hover:opacity-100"><Icon name="Edit2" className="w-5 h-5" /></button>
+                                                                                <button onClick={() => handleDeleteExam(e.id)} className="p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all opacity-100 md:opacity-0 group-hover:opacity-100"><Icon name="Trash2" className="w-5 h-5" /></button>
+                                                                            </div>
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                            );
+                                                        })
+                                                    ) : (
+                                                        <div className="text-center py-12 text-slate-400 font-bold border-2 border-dashed border-slate-200 rounded-2xl bg-white shadow-sm">
+                                                            <Icon name="Award" className="w-12 h-12 mx-auto mb-3 opacity-30 text-yellow-500" /> 目前還沒有任何考試紀錄喔！
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {/* 分頁 4：獎勵紀錄 */}
                                         {parentTab === 'rewards' && (
-                                            <div className="max-w-2xl mx-auto space-y-6">
+                                            <div className="max-w-3xl mx-auto space-y-6">
                                                 
                                                 <div className="bg-gradient-to-br from-indigo-50 to-blue-50 p-5 md:p-6 rounded-2xl border border-indigo-100 shadow-sm relative overflow-hidden">
                                                     <div className="absolute top-0 right-0 p-4 opacity-10 pointer-events-none"><Icon name="Trophy" className="w-24 h-24 text-indigo-900" /></div>
@@ -1162,7 +1977,7 @@
                                                     <div className="flex flex-col gap-4 relative z-10">
                                                         <div className="bg-white/80 backdrop-blur-sm p-4 rounded-xl shadow-sm border border-slate-100">
                                                             <div className="flex justify-between items-end mb-2">
-                                                                <p className="font-bold text-slate-700 flex items-center gap-2"><Icon name="Calendar" className="w-4 h-4 text-emerald-500"/> 本週進度 (週一至週日)</p>
+                                                                <p className="font-bold text-slate-700 flex items-center gap-2"><Icon name="Calendar" className="w-4 h-4 text-emerald-500"/> 本週作息 (週一至週日)</p>
                                                                 <p className="text-sm font-black text-emerald-600">{currentWeekProgress} / 7 天</p>
                                                             </div>
                                                             <div className="w-full bg-slate-200 rounded-full h-3 mb-1 overflow-hidden">
@@ -1171,7 +1986,7 @@
                                                         </div>
                                                         <div className="bg-white/80 backdrop-blur-sm p-4 rounded-xl shadow-sm border border-slate-100">
                                                             <div className="flex justify-between items-end mb-2">
-                                                                <p className="font-bold text-slate-700 flex items-center gap-2"><Icon name="Crown" className="w-4 h-4 text-orange-500"/> 本月進度 (1號至月底)</p>
+                                                                <p className="font-bold text-slate-700 flex items-center gap-2"><Icon name="Crown" className="w-4 h-4 text-orange-500"/> 本月作息 (1號至月底)</p>
                                                                 <p className="text-sm font-black text-orange-500">{currentMonthProgress.count} / {currentMonthProgress.total} 天</p>
                                                             </div>
                                                             <div className="w-full bg-slate-200 rounded-full h-3 mb-1 overflow-hidden">
@@ -1186,29 +2001,30 @@
                                                     {unclaimedRewards.length > 0 ? (
                                                         <div className="space-y-3">
                                                             {unclaimedRewards.map(reward => (
-                                                                <div key={reward.periodId} className={`p-4 rounded-xl border flex flex-col gap-3 shadow-sm ${reward.type === 'monthly' ? 'bg-orange-50 border-orange-200' : 'bg-emerald-50 border-emerald-200'}`}>
+                                                                <div key={reward.periodId} className={`p-4 rounded-xl border flex flex-col gap-3 shadow-sm ${reward.type === 'monthly' ? 'bg-orange-50 border-orange-200' : reward.type === 'exam' ? 'bg-indigo-50 border-indigo-200' : 'bg-emerald-50 border-emerald-200'}`}>
                                                                     <div className="flex justify-between items-center">
-                                                                        <span className={`font-black flex items-center gap-1 ${reward.type === 'monthly' ? 'text-orange-800' : 'text-emerald-800'}`}>
-                                                                            <Icon name={reward.type === 'monthly' ? 'Crown' : 'Gift'} className="w-4 h-4" />
+                                                                        <span className={`font-black flex items-center gap-1 ${reward.type === 'monthly' ? 'text-orange-800' : reward.type === 'exam' ? 'text-indigo-800' : 'text-emerald-800'}`}>
+                                                                            <Icon name={reward.type === 'monthly' ? 'Crown' : reward.type === 'exam' ? 'Award' : 'Gift'} className="w-4 h-4" />
                                                                             {reward.label}
+                                                                            {reward.count > 1 && <span className="ml-2 text-red-500 bg-red-100 px-2 py-0.5 rounded text-xs font-black">可兌換 {reward.count} 次</span>}
                                                                         </span>
                                                                     </div>
                                                                     <div className="flex flex-col md:flex-row gap-2">
                                                                         <input 
                                                                             type="text" 
                                                                             placeholder="輸入發放的獎品 (例: 買玩具、看電視)" 
-                                                                            value={pendingRewardsInputs[reward.periodId] || ''}
+                                                                            value={pendingRewardsInputs[reward.periodId] !== undefined ? pendingRewardsInputs[reward.periodId] : (reward.defaultRewardName || '')}
                                                                             onChange={(e) => setPendingRewardsInputs(prev => ({...prev, [reward.periodId]: e.target.value}))}
                                                                             onKeyDown={(e) => e.key === 'Enter' && handleClaimReward(reward)}
                                                                             className="flex-1 px-3 py-2 rounded-lg border border-slate-300 outline-none focus:ring-2 focus:ring-indigo-300 font-bold"
                                                                         />
-                                                                        <button onClick={() => handleClaimReward(reward)} className={`text-white px-4 py-2 rounded-lg font-black shadow-sm shrink-0 ${reward.type === 'monthly' ? 'bg-orange-500 hover:bg-orange-600' : 'bg-emerald-500 hover:bg-emerald-600'}`}>記錄已兌換</button>
+                                                                        <button onClick={() => handleClaimReward(reward)} className={`text-white px-4 py-2 rounded-lg font-black shadow-sm shrink-0 ${reward.type === 'monthly' ? 'bg-orange-500 hover:bg-orange-600' : reward.type === 'exam' ? 'bg-indigo-500 hover:bg-indigo-600' : 'bg-emerald-500 hover:bg-emerald-600'}`}>記錄已兌換</button>
                                                                     </div>
                                                                 </div>
                                                             ))}
                                                         </div>
                                                     ) : (
-                                                        <div className="bg-slate-50 border border-slate-200 rounded-xl p-6 text-center text-slate-400 font-bold">
+                                                        <div className="bg-slate-50 border border-slate-200 rounded-xl p-6 text-center text-slate-400 font-bold shadow-sm">
                                                             目前沒有可兌換的獎勵，繼續保持努力！
                                                         </div>
                                                     )}
@@ -1225,8 +2041,8 @@
                                                                 <div key={reward.id} className={`flex items-center justify-between bg-white border-2 p-4 rounded-xl shadow-sm transition-shadow group ${!isValid ? 'border-red-300 bg-red-50/50' : 'border-slate-200 hover:border-indigo-200'}`}>
                                                                     <div className="flex flex-col flex-1 gap-2 overflow-hidden">
                                                                         <div className="flex items-center gap-4 w-full">
-                                                                            <div className={`w-10 h-10 md:w-12 md:h-12 rounded-full flex items-center justify-center shrink-0 shadow-inner border-2 ${!isValid ? 'bg-red-50 text-red-500 border-red-100' : reward.type === 'monthly' ? 'bg-orange-50 text-orange-500 border-orange-100' : 'bg-emerald-50 text-emerald-500 border-emerald-100'}`}>
-                                                                                {!isValid ? <Icon name="AlertTriangle" className="w-5 h-5 md:w-6 md:h-6" /> : <Icon name={reward.type === 'monthly' ? 'Crown' : 'Gift'} className="w-5 h-5 md:w-6 md:h-6" />}
+                                                                            <div className={`w-10 h-10 md:w-12 md:h-12 rounded-full flex items-center justify-center shrink-0 shadow-inner border-2 ${!isValid ? 'bg-red-50 text-red-500 border-red-100' : reward.type === 'monthly' ? 'bg-orange-50 text-orange-500 border-orange-100' : reward.type === 'exam' ? 'bg-indigo-50 text-indigo-500 border-indigo-100' : 'bg-emerald-50 text-emerald-500 border-emerald-100'}`}>
+                                                                                {!isValid ? <Icon name="AlertTriangle" className="w-5 h-5 md:w-6 md:h-6" /> : <Icon name={reward.type === 'monthly' ? 'Crown' : reward.type === 'exam' ? 'Award' : 'Gift'} className="w-5 h-5 md:w-6 md:h-6" />}
                                                                             </div>
                                                                             <div className="flex-1 overflow-hidden">
                                                                                 {isEditing ? (
@@ -1245,13 +2061,13 @@
                                                                                 ) : (
                                                                                     <div className="flex flex-col md:flex-row md:items-center gap-1 md:gap-2 mb-0.5">
                                                                                         <p className={`font-black text-base md:text-lg leading-tight truncate ${!isValid ? 'text-red-700 line-through opacity-70' : 'text-slate-800'}`}>{reward.title}</p>
-                                                                                        <span className={`text-[10px] px-2 py-0.5 rounded border font-bold inline-block w-max shrink-0 ${!isValid ? 'bg-red-100 text-red-600 border-red-200' : reward.type === 'monthly' ? 'bg-orange-100 text-orange-600 border-orange-200' : 'bg-emerald-100 text-emerald-600 border-emerald-200'}`}>
+                                                                                        <span className={`text-[10px] px-2 py-0.5 rounded border font-bold inline-block w-max shrink-0 ${!isValid ? 'bg-red-100 text-red-600 border-red-200' : reward.type === 'monthly' ? 'bg-orange-100 text-orange-600 border-orange-200' : reward.type === 'exam' ? 'bg-indigo-100 text-indigo-600 border-indigo-200' : 'bg-emerald-100 text-emerald-600 border-emerald-200'}`}>
                                                                                             {reward.periodLabel}
                                                                                         </span>
                                                                                     </div>
                                                                                 )}
                                                                                 {!isEditing && <p className="text-xs text-slate-400 font-bold flex items-center gap-1 truncate"><Icon name="Calendar" className="w-3 h-3 shrink-0"/> 兌換日期：{reward.date}</p>}
-                                                                                {!isValid && !isEditing && <p className="text-[10px] md:text-xs text-red-500 font-bold mt-1 animate-pulse flex items-center gap-1"><Icon name="AlertTriangle" className="w-3 h-3 shrink-0"/> 警告：該週期任務紀錄已被修改，達標失效！</p>}
+                                                                                {!isValid && !isEditing && <p className="text-[10px] md:text-xs text-red-500 font-bold mt-1 animate-pulse flex items-center gap-1"><Icon name="AlertTriangle" className="w-3 h-3 shrink-0"/> 警告：該週期成績/紀錄已異動，達標失效！</p>}
                                                                             </div>
                                                                         </div>
                                                                     </div>
@@ -1278,7 +2094,7 @@
                                             </div>
                                         )}
 
-                                        {/* 分頁 3：作息維護 */}
+                                        {/* 分頁 5：作息維護 */}
                                         {parentTab === 'manage' && (
                                             <div className="max-w-4xl mx-auto space-y-4">
                                                 <button onClick={addTask} className="w-full py-5 border-2 border-dashed border-indigo-300 rounded-2xl text-indigo-500 font-black text-base hover:bg-indigo-50 flex items-center justify-center gap-2 transition-all">
@@ -1301,7 +2117,7 @@
                                                                     <div className="w-8 h-8 rounded shrink-0 bg-slate-100 flex items-center justify-center drag-handle touch-none cursor-grab text-slate-400 hover:text-indigo-600 hover:bg-indigo-50">
                                                                         <Icon name="GripVertical" className="w-5 h-5 pointer-events-none" />
                                                                     </div>
-                                                                    <input value={task.title} onChange={(e) => updateTask(task.id, 'title', e.target.value)} className="flex-1 text-base md:text-lg font-bold bg-transparent border border-transparent hover:border-slate-200 focus:border-indigo-300 focus:bg-slate-50 rounded px-2 py-1 outline-none transition-all placeholder:text-slate-300" placeholder="輸入作息名稱" />
+                                                                    <input value={task.title} onChange={(e) => updateTask(task.id, 'title', e.target.value)} className="flex-1 text-base md:text-lg font-bold bg-transparent border border-slate-100 hover:border-slate-300 focus:border-indigo-400 focus:bg-slate-50 rounded px-3 py-1.5 outline-none transition-all placeholder:text-slate-300" placeholder="輸入作息名稱" />
                                                                 </div>
                                                                 <div className="flex items-center justify-between md:justify-end gap-3 pl-10 md:pl-0">
                                                                     <div className="flex gap-1">
