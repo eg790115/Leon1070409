@@ -17,6 +17,24 @@
     <meta name="theme-color" content="#f97316">
     <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/1426/1426735.png">
 
+    <link id="manifest-link" rel="manifest">
+    <script>
+      (function() {
+        var manifest = {
+          "name": "洋洋作息打勾表",
+          "short_name": "洋洋作息",
+          "start_url": ".",
+          "display": "standalone",
+          "display_override": ["fullscreen", "standalone"],
+          "background_color": "#f1f5f9",
+          "theme_color": "#f97316",
+          "icons": [{ "src": "https://cdn-icons-png.flaticon.com/512/1426/1426735.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }]
+        };
+        var blob = new Blob([JSON.stringify(manifest)], { type: 'application/manifest+json' });
+        document.getElementById('manifest-link').href = URL.createObjectURL(blob);
+      })();
+    </script>
+
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -181,100 +199,35 @@
             { id: '19', cat: '週末', title: '喝小安素', rule: [6, 7] }
         ];
 
+        // 徹底放棄帶有版號的 DB 名稱，確保 PWA 更新後資料永遠不流失
         const DB_NAME = 'YangYangRoyal_PROD'; 
         const STORE_NAME = 'ChecklistData';
+
+        // ==========================================
+        // 全域安全輔助函數：利用 function hoisting 防止 TDZ 報錯
+        // ==========================================
         
-        const getYYYYMMDD = (date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+        function getYYYYMMDD(date) {
+            return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+        }
 
-        const STORAGE_KEYS = {
-            TASKS: 'yang_data_tasks', TASKS_BAK: 'yang_data_tasks_bak',
-            PROGRESS: (dateStr) => `yang_data_checked_${dateStr}`, PROGRESS_BAK: (dateStr) => `yang_data_checked_${dateStr}_bak`,
-            COMPLETED_DATES: 'yang_data_completed_dates',
-            REWARDS: 'yang_data_rewards',
-            EXAMS: 'yang_data_exams',
-            EXAM_SUBJECTS: 'yang_data_exam_subjects',
-            EXAM_TYPES: 'yang_data_exam_types',
-            EXAM_UNITS: 'yang_data_exam_units',
-            EVENTS: 'yang_data_events',
-            EXAM_RULES: 'yang_data_exam_rules',
-            PARENT_PIN: 'yang_data_parent_pin',
-            PARENT_BIO: 'yang_data_parent_bio_id'
-        };
-
-        const EVENT_TYPES = {
-            'school': { label: '學校', color: 'bg-blue-100 text-blue-700 border-blue-200' },
-            'aftercare': { label: '安親班', color: 'bg-emerald-100 text-emerald-700 border-emerald-200' },
-            'gloria': { label: '葛洛莉', color: 'bg-purple-100 text-purple-700 border-purple-200' },
-            'leave': { label: '請假', color: 'bg-red-100 text-red-700 border-red-200' }
-        };
-
-        const openDB = () => {
-            return new Promise((resolve) => {
-                try {
-                    const request = indexedDB.open(DB_NAME, 1);
-                    request.onupgradeneeded = (e) => e.target.result.createObjectStore(STORE_NAME);
-                    request.onsuccess = () => resolve(request.result);
-                    request.onerror = () => resolve(null);
-                } catch(e) { resolve(null); }
-            });
-        };
-
-        const idbSave = async (key, data) => { try { const db = await openDB(); if(db) db.transaction(STORE_NAME, 'readwrite').objectStore(STORE_NAME).put(data, key); } catch (e) {} };
-        const idbLoad = async (key) => {
-            try {
-                const db = await openDB();
-                if (!db) return null;
-                return new Promise((resolve) => {
-                    const request = db.transaction(STORE_NAME, 'readonly').objectStore(STORE_NAME).get(key);
-                    request.onsuccess = () => resolve(request.result);
-                    request.onerror = () => resolve(null);
-                });
-            } catch (e) { return null; }
-        };
-
-        const saveTimeouts = {}; 
-        
-        const robustSave = (key, backupKey, data) => {
-            const json = JSON.stringify(data);
-            try { localStorage.setItem(key, json); localStorage.setItem(backupKey, json); } catch (e) {}
-            if (saveTimeouts[key]) clearTimeout(saveTimeouts[key]);
-            saveTimeouts[key] = setTimeout(() => idbSave(key, data), 500); 
-        };
-
-        const robustLoad = async (key, backupKey, defaultValue) => {
-            try {
-                let primary = localStorage.getItem(key);
-                if (!primary) primary = localStorage.getItem(key.replace('yang_data_', 'yang_v92_')); 
-                if (primary) return JSON.parse(primary);
-                
-                let backup = localStorage.getItem(backupKey);
-                if (!backup && backupKey) backup = localStorage.getItem(backupKey.replace('yang_data_', 'yang_v92_'));
-                if (backup) return JSON.parse(backup);
-            } catch (e) {}
-            
-            const idbData = await idbLoad(key);
-            if (idbData) return idbData;
-            
-            return defaultValue;
-        };
-
-        const baseDays = [
-            { id: 1, label: '一' }, { id: 2, label: '二' }, { id: 3, label: '三' },
-            { id: 4, label: '四' }, { id: 5, label: '五' }, { id: 6, label: '六' }, { id: 7, label: '日' },
-        ];
-
-        // 全域輔助函數，避免 React 渲染週期干擾
-        const isDayActuallyCompletedFunc = (dateStr, completedSet, allTasks) => {
+        function isDayActuallyCompleted(dateStr, completedSet, allTasks) {
             if (completedSet.has(dateStr)) return true;
-            const dObj = new Date(dateStr);
+            const dObj = new Date(dateStr.replace(/-/g, "/"));
             const dow = dObj.getDay() || 7;
             const tasksForDay = allTasks.filter(t => t.rule.includes(dow));
             return tasksForDay.length === 0;
-        };
+        }
 
-        const triggerVibration = () => { try { if (window.navigator && window.navigator.vibrate) window.navigator.vibrate([30, 50, 30]); } catch (e) {} };
+        function delay(ms) {
+            return new Promise(res => setTimeout(res, ms));
+        }
 
-        const playSound = (type) => {
+        function triggerVibration() {
+            try { if (window.navigator && window.navigator.vibrate) window.navigator.vibrate([30, 50, 30]); } catch (e) {} 
+        }
+
+        function playSound(type) {
             try {
                 const AudioContext = window.AudioContext || window.webkitAudioContext;
                 if (!AudioContext) return;
@@ -319,18 +272,94 @@
                     });
                 }
             } catch(e) {}
-        };
+        }
 
-        const getWeekLabel = (dateStr) => {
-            const dObj = new Date(dateStr);
+        function getWeekLabel(dateStr) {
+            const dObj = new Date(dateStr.replace(/-/g, "/"));
             const m = dObj.getMonth() + 1;
             const firstDay = new Date(dObj.getFullYear(), dObj.getMonth(), 1).getDay() || 7;
             const weekNum = Math.ceil((dObj.getDate() + firstDay - 1) / 7);
             const weekNames = ['一', '二', '三', '四', '五', '六'];
             return `${m}月第${weekNames[weekNum - 1] || weekNum}週`;
+        }
+
+        function openDB() {
+            return new Promise((resolve) => {
+                try {
+                    const request = indexedDB.open(DB_NAME, 1);
+                    request.onupgradeneeded = (e) => e.target.result.createObjectStore(STORE_NAME);
+                    request.onsuccess = () => resolve(request.result);
+                    request.onerror = () => resolve(null);
+                } catch(e) { resolve(null); }
+            });
+        }
+
+        async function idbSave(key, data) {
+            try { 
+                const db = await openDB(); 
+                if(db) db.transaction(STORE_NAME, 'readwrite').objectStore(STORE_NAME).put(data, key); 
+            } catch (e) {} 
+        }
+
+        async function idbLoad(key) {
+            try {
+                const db = await openDB();
+                if (!db) return null;
+                return new Promise((resolve) => {
+                    const request = db.transaction(STORE_NAME, 'readonly').objectStore(STORE_NAME).get(key);
+                    request.onsuccess = () => resolve(request.result);
+                    request.onerror = () => resolve(null);
+                });
+            } catch (e) { return null; }
+        }
+
+        const saveTimeouts = {}; 
+        
+        function robustSave(key, backupKey, data) {
+            const json = JSON.stringify(data);
+            try { localStorage.setItem(key, json); localStorage.setItem(backupKey, json); } catch (e) {}
+            if (saveTimeouts[key]) clearTimeout(saveTimeouts[key]);
+            saveTimeouts[key] = setTimeout(() => idbSave(key, data), 500); 
+        }
+
+        async function robustLoad(key, backupKey, defaultValue) {
+            try {
+                let primary = localStorage.getItem(key);
+                if (!primary) primary = localStorage.getItem(key.replace('yang_data_', 'yang_v92_')); 
+                if (primary) return JSON.parse(primary);
+                
+                let backup = localStorage.getItem(backupKey);
+                if (!backup && backupKey) backup = localStorage.getItem(backupKey.replace('yang_data_', 'yang_v92_'));
+                if (backup) return JSON.parse(backup);
+            } catch (e) {}
+            
+            const idbData = await idbLoad(key);
+            if (idbData) return idbData;
+            
+            return defaultValue;
+        }
+
+        const STORAGE_KEYS = {
+            TASKS: 'yang_data_tasks', TASKS_BAK: 'yang_data_tasks_bak',
+            PROGRESS: (dateStr) => `yang_data_checked_${dateStr}`, PROGRESS_BAK: (dateStr) => `yang_data_checked_${dateStr}_bak`,
+            COMPLETED_DATES: 'yang_data_completed_dates',
+            REWARDS: 'yang_data_rewards',
+            EXAMS: 'yang_data_exams',
+            EXAM_SUBJECTS: 'yang_data_exam_subjects',
+            EXAM_TYPES: 'yang_data_exam_types',
+            EXAM_UNITS: 'yang_data_exam_units',
+            EVENTS: 'yang_data_events',
+            EXAM_RULES: 'yang_data_exam_rules',
+            PARENT_PIN: 'yang_data_parent_pin',
+            PARENT_BIO: 'yang_data_parent_bio_id'
         };
 
-        const delay = (ms) => new Promise(res => setTimeout(res, ms));
+        const EVENT_TYPES = {
+            'school': { label: '學校', color: 'bg-blue-100 text-blue-700 border-blue-200' },
+            'aftercare': { label: '安親班', color: 'bg-emerald-100 text-emerald-700 border-emerald-200' },
+            'gloria': { label: '葛洛莉', color: 'bg-purple-100 text-purple-700 border-purple-200' },
+            'leave': { label: '請假', color: 'bg-red-100 text-red-700 border-red-200' }
+        };
 
         const App = () => {
             const [mode, setMode] = useState('kid'); 
@@ -354,6 +383,11 @@
             const realDayOfWeek = useMemo(() => realToday.getDay() || 7, [realToday]);
             const formattedDate = useMemo(() => `${realToday.getFullYear()}年${realToday.getMonth() + 1}月${realToday.getDate()}日`, [realToday]);
 
+            const baseDays = useMemo(() => [
+                { id: 1, label: '一' }, { id: 2, label: '二' }, { id: 3, label: '三' },
+                { id: 4, label: '四' }, { id: 5, label: '五' }, { id: 6, label: '六' }, { id: 7, label: '日' },
+            ], []);
+
             const daysWithDates = useMemo(() => {
                 const monday = new Date(realToday);
                 monday.setDate(realToday.getDate() - (realDayOfWeek - 1));
@@ -363,7 +397,7 @@
                     const fullDateStr = getYYYYMMDD(d);
                     return { ...day, dateStr: `${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')}`, fullDateStr };
                 });
-            }, [realToday, realDayOfWeek]);
+            }, [realToday, realDayOfWeek, baseDays]);
 
             const [selectedDay, setSelectedDay] = useState(realDayOfWeek); 
             const activeDateStr = useMemo(() => daysWithDates.find(d => d.id === selectedDay)?.fullDateStr, [selectedDay, daysWithDates]);
@@ -511,7 +545,7 @@
                 }
             });
 
-            // 資料初始化載入
+            // 初始化載入
             useEffect(() => {
                 const initData = async () => {
                     const tasks = await robustLoad(STORAGE_KEYS.TASKS, STORAGE_KEYS.TASKS_BAK, defaultTasks);
@@ -601,9 +635,9 @@
 
             const currentStreak = useMemo(() => {
                 let streak = 0; let checkDate = new Date(realToday);
-                if (isDayActuallyCompletedFunc(getYYYYMMDD(checkDate), new Set(completedDates), allTasks)) { streak++; checkDate.setDate(checkDate.getDate() - 1); }
-                else { checkDate.setDate(checkDate.getDate() - 1); if (isDayActuallyCompletedFunc(getYYYYMMDD(checkDate), new Set(completedDates), allTasks)) { streak++; checkDate.setDate(checkDate.getDate() - 1); } else { return 0; } }
-                while (true) { if (isDayActuallyCompletedFunc(getYYYYMMDD(checkDate), new Set(completedDates), allTasks)) { streak++; checkDate.setDate(checkDate.getDate() - 1); } else { break; } }
+                if (isDayActuallyCompleted(getYYYYMMDD(checkDate), new Set(completedDates), allTasks)) { streak++; checkDate.setDate(checkDate.getDate() - 1); }
+                else { checkDate.setDate(checkDate.getDate() - 1); if (isDayActuallyCompleted(getYYYYMMDD(checkDate), new Set(completedDates), allTasks)) { streak++; checkDate.setDate(checkDate.getDate() - 1); } else { return 0; } }
+                while (true) { if (isDayActuallyCompleted(getYYYYMMDD(checkDate), new Set(completedDates), allTasks)) { streak++; checkDate.setDate(checkDate.getDate() - 1); } else { break; } }
                 return streak;
             }, [completedDates, realToday, allTasks]);
 
@@ -615,7 +649,7 @@
                 const completedSet = new Set(completedDates);
                 for(let i=0; i<7; i++) {
                     const cur = new Date(mon); cur.setDate(cur.getDate() + i);
-                    if (isDayActuallyCompletedFunc(getYYYYMMDD(cur), completedSet, allTasks)) count++;
+                    if (isDayActuallyCompleted(getYYYYMMDD(cur), completedSet, allTasks)) count++;
                 }
                 return count;
             }, [realToday, completedDates, allTasks]);
@@ -627,7 +661,7 @@
                 const completedSet = new Set(completedDates);
                 for(let i=1; i<=daysInMonth; i++) {
                     const cur = `${y}-${String(m).padStart(2,'0')}-${String(i).padStart(2,'0')}`;
-                    if (isDayActuallyCompletedFunc(cur, completedSet, allTasks)) count++;
+                    if (isDayActuallyCompleted(cur, completedSet, allTasks)) count++;
                 }
                 return { count, total: daysInMonth };
             }, [realToday, completedDates, allTasks]);
@@ -635,10 +669,10 @@
             const isPeriodFullyCompleted = useCallback((periodId) => {
                 const completedSet = new Set(completedDates);
                 if (periodId.startsWith('W-')) {
-                    const dateStr = periodId.substring(2); const start = new Date(dateStr);
+                    const dateStr = periodId.substring(2); const start = new Date(dateStr.replace(/-/g, "/"));
                     for(let i=0; i<7; i++) {
                         const cur = new Date(start); cur.setDate(cur.getDate() + i);
-                        if (!isDayActuallyCompletedFunc(getYYYYMMDD(cur), completedSet, allTasks)) return false;
+                        if (!isDayActuallyCompleted(getYYYYMMDD(cur), completedSet, allTasks)) return false;
                     }
                     return true;
                 } else if (periodId.startsWith('M-')) {
@@ -646,7 +680,7 @@
                     const daysInMonth = new Date(y, m, 0).getDate();
                     for(let i=1; i<=daysInMonth; i++) {
                         const cur = `${y}-${String(m).padStart(2,'0')}-${String(i).padStart(2,'0')}`;
-                        if (!isDayActuallyCompletedFunc(cur, completedSet, allTasks)) return false;
+                        if (!isDayActuallyCompleted(cur, completedSet, allTasks)) return false;
                     }
                     return true;
                 } else if (periodId.startsWith('EXAM-')) {
@@ -680,7 +714,7 @@
                     let isFull = true;
                     for(let i=0; i<7; i++) {
                         const cur = new Date(mon); cur.setDate(cur.getDate() + i);
-                        if (!isDayActuallyCompletedFunc(getYYYYMMDD(cur), completedSet, allTasks)) { isFull = false; break; }
+                        if (!isDayActuallyCompleted(getYYYYMMDD(cur), completedSet, allTasks)) { isFull = false; break; }
                     }
                     if (isFull) {
                         const end = new Date(mon); end.setDate(end.getDate() + 6);
@@ -698,7 +732,7 @@
                     let isFull = true;
                     for(let i=1; i<=daysInMonth; i++) {
                         const cur = `${curMonth.getFullYear()}-${String(curMonth.getMonth()+1).padStart(2,'0')}-${String(i).padStart(2,'0')}`;
-                        if (!isDayActuallyCompletedFunc(cur, completedSet, allTasks)) { isFull = false; break; }
+                        if (!isDayActuallyCompleted(cur, completedSet, allTasks)) { isFull = false; break; }
                     }
                     if (isFull) available.push({ periodId: mId, type: 'monthly', label: `${curMonth.getMonth()+1}月份 全月達成` });
                 }
@@ -761,6 +795,7 @@
                 return { year, month: month + 1, data };
             }, [parentMonthOffset, allTasks, realToday, events, checkedItems, activeDateStr, syncTrigger]);
 
+            // 考試專用月曆資料
             const examCalendarData = useMemo(() => {
                 const base = new Date(realToday);
                 base.setMonth(base.getMonth() + examMonthOffset);
@@ -998,6 +1033,7 @@
                         setNewEventType('school');
                         setIsAnalyzingPhoto(false);
                         playSound('tada');
+                        if(e.target) e.target.value = '';
                     }, 1500);
                 }
             };
@@ -1381,53 +1417,53 @@
                         </div>
                     )}
 
-                    {/* 家長登入鎖定遮罩 */}
-                    {mode === 'parent' && !isParentAuth && (
-                        <div className="fixed inset-0 z-[500] bg-slate-900 flex flex-col items-center justify-center animate-in p-6">
-                            <div className="w-full max-w-sm bg-slate-800 rounded-[2.5rem] p-8 shadow-2xl border border-slate-700 text-center relative overflow-hidden">
-                                <div className="w-16 h-16 bg-indigo-500/20 text-indigo-400 rounded-full flex items-center justify-center mx-auto mb-4 border-2 border-indigo-500/50 shadow-[0_0_15px_rgba(99,102,241,0.3)]">
-                                    <Icon name="Lock" className="w-8 h-8" />
-                                </div>
-                                <h2 className="text-2xl font-black text-white mb-2 tracking-widest">皇室管理區</h2>
-                                <p className="text-slate-400 text-xs font-bold mb-6">請輸入 4 位數 PIN 碼，或使用生物辨識解鎖</p>
-                                
-                                {loginError && <p className="text-red-400 text-xs font-bold mb-4 animate-shake">{loginError}</p>}
-                                
-                                {hasBioBound && (
-                                    <button onClick={loginWithBiometrics} className="w-full py-4 bg-indigo-600 hover:bg-indigo-500 text-white rounded-2xl font-black mb-6 active:scale-95 transition-all shadow-lg flex justify-center items-center gap-2">
-                                        <Icon name="Fingerprint" className="w-5 h-5" /> 生物辨識快速登入
-                                    </button>
-                                )}
-                                
-                                <div className="flex justify-center gap-3 mb-8">
-                                    {[...Array(4)].map((_, i) => <div key={i} className={`w-3.5 h-3.5 rounded-full border-2 border-indigo-500 transition-all duration-200 ${loginPin.length > i ? "bg-indigo-400 scale-125 shadow-[0_0_10px_rgba(99,102,241,0.6)]" : "bg-transparent"}`}></div>)}
-                                </div>
-
-                                <div className="grid grid-cols-3 gap-3 text-white">
-                                    {[1,2,3,4,5,6,7,8,9,"C",0,"←"].map(k => (
-                                        <button key={k} onClick={() => {
-                                            if (k === "C") { setLoginPin(""); return; }
-                                            if (k === "←") { setLoginPin(loginPin.slice(0,-1)); return; }
-                                            const n = loginPin + k; 
-                                            if (n.length > 4) return; 
-                                            setLoginPin(n);
-                                            if (n.length === 4) handlePinLogin(n);
-                                        }} className="bg-white/5 h-14 rounded-xl font-black text-2xl active:bg-indigo-600 transition-all border border-white/5 shadow-sm">
-                                            {k}
-                                        </button>
-                                    ))}
-                                </div>
-                                
-                                <div className="mt-8 flex justify-between items-center px-2">
-                                    <button onClick={() => { setMode('kid'); setLoginPin(''); setLoginError(''); }} className="text-slate-400 text-xs font-bold underline underline-offset-4 hover:text-white">返回洋洋模式</button>
-                                    <button onClick={() => alert("【緊急救援】\n若忘記密碼，請輸入救援萬用碼：9999\n這會強制解鎖並將密碼重置為 0000。")} className="text-slate-500 text-[10px] font-bold">忘記密碼？</button>
-                                </div>
-                            </div>
-                        </div>
-                    )}
-
                     <div className="w-full max-w-4xl flex flex-col h-full relative shadow-2xl bg-white border-x-4 border-slate-200">
                         
+                        {/* 家長登入鎖定遮罩 */}
+                        {mode === 'parent' && !isParentAuth && (
+                            <div className="absolute inset-0 z-[100] bg-slate-900 flex flex-col items-center justify-center animate-in p-6">
+                                <div className="w-full max-w-sm bg-slate-800 rounded-[2.5rem] p-8 shadow-2xl border border-slate-700 text-center relative overflow-hidden">
+                                    <div className="w-16 h-16 bg-indigo-500/20 text-indigo-400 rounded-full flex items-center justify-center mx-auto mb-4 border-2 border-indigo-500/50 shadow-[0_0_15px_rgba(99,102,241,0.3)]">
+                                        <Icon name="Lock" className="w-8 h-8" />
+                                    </div>
+                                    <h2 className="text-2xl font-black text-white mb-2 tracking-widest">皇室管理區</h2>
+                                    <p className="text-slate-400 text-xs font-bold mb-6">請輸入 4 位數 PIN 碼，或使用生物辨識解鎖</p>
+                                    
+                                    {loginError && <p className="text-red-400 text-xs font-bold mb-4 animate-shake">{loginError}</p>}
+                                    
+                                    {hasBioBound && (
+                                        <button onClick={loginWithBiometrics} className="w-full py-4 bg-indigo-600 hover:bg-indigo-500 text-white rounded-2xl font-black mb-6 active:scale-95 transition-all shadow-lg flex justify-center items-center gap-2">
+                                            <Icon name="Fingerprint" className="w-5 h-5" /> 生物辨識快速登入
+                                        </button>
+                                    )}
+                                    
+                                    <div className="flex justify-center gap-3 mb-8">
+                                        {[...Array(4)].map((_, i) => <div key={i} className={`w-3.5 h-3.5 rounded-full border-2 border-indigo-500 transition-all duration-200 ${loginPin.length > i ? "bg-indigo-400 scale-125 shadow-[0_0_10px_rgba(99,102,241,0.6)]" : "bg-transparent"}`}></div>)}
+                                    </div>
+
+                                    <div className="grid grid-cols-3 gap-3 text-white">
+                                        {[1,2,3,4,5,6,7,8,9,"C",0,"←"].map(k => (
+                                            <button key={k} onClick={() => {
+                                                if (k === "C") { setLoginPin(""); return; }
+                                                if (k === "←") { setLoginPin(loginPin.slice(0,-1)); return; }
+                                                const n = loginPin + k; 
+                                                if (n.length > 4) return; 
+                                                setLoginPin(n);
+                                                if (n.length === 4) handlePinLogin(n);
+                                            }} className="bg-white/5 h-14 rounded-xl font-black text-2xl active:bg-indigo-600 transition-all border border-white/5 shadow-sm">
+                                                {k}
+                                            </button>
+                                        ))}
+                                    </div>
+                                    
+                                    <div className="mt-8 flex justify-between items-center px-2">
+                                        <button onClick={() => { setMode('kid'); setLoginPin(''); setLoginError(''); }} className="text-slate-400 text-xs font-bold underline underline-offset-4 hover:text-white">返回洋洋模式</button>
+                                        <button onClick={() => alert("【緊急救援】\n若忘記密碼，請輸入救援萬用碼：9999\n這會強制解鎖並將密碼重置為 0000。")} className="text-slate-500 text-[10px] font-bold">忘記密碼？</button>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
                         {/* 頂部切換鈕 */}
                         <div className="flex justify-center shrink-0 w-full z-20 pt-3 pb-3 bg-slate-100 border-b border-slate-200">
                             <div className="bg-white/80 backdrop-blur-md p-1.5 rounded-xl shadow-sm border border-slate-200 flex gap-1 items-center">
@@ -1442,7 +1478,7 @@
                             </div>
                         </div>
 
-                        <div className="flex flex-col flex-1 min-h-0 relative bg-slate-50">
+                        <div className="main-card relative bg-slate-50 flex flex-col flex-1 min-h-0">
                             {/* 洋洋模式內容 */}
                             {mode === 'kid' && (
                                 <div className="flex flex-col h-full relative min-h-0 flex-1">
