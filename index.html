@@ -17,24 +17,6 @@
     <meta name="theme-color" content="#f97316">
     <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/1426/1426735.png">
 
-    <link id="manifest-link" rel="manifest">
-    <script>
-      (function() {
-        var manifest = {
-          "name": "洋洋作息打勾表",
-          "short_name": "洋洋作息",
-          "start_url": ".",
-          "display": "standalone",
-          "display_override": ["fullscreen", "standalone"],
-          "background_color": "#f1f5f9",
-          "theme_color": "#f97316",
-          "icons": [{ "src": "https://cdn-icons-png.flaticon.com/512/1426/1426735.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }]
-        };
-        var blob = new Blob([JSON.stringify(manifest)], { type: 'application/manifest+json' });
-        document.getElementById('manifest-link').href = URL.createObjectURL(blob);
-      })();
-    </script>
-
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -197,6 +179,12 @@
             { id: '17', cat: '葛洛莉', title: '把英文功課寫完', rule: [3, 6] },
             { id: '18', cat: '葛洛莉', title: '聯絡簿與Green Card放餐桌', rule: [3, 6] },
             { id: '19', cat: '週末', title: '喝小安素', rule: [6, 7] }
+        ];
+
+        // 將 baseDays 定義於全域，供所有依賴的 Hook 使用
+        const baseDays = [
+            { id: 1, label: '一' }, { id: 2, label: '二' }, { id: 3, label: '三' },
+            { id: 4, label: '四' }, { id: 5, label: '五' }, { id: 6, label: '六' }, { id: 7, label: '日' },
         ];
 
         // 徹底放棄帶有版號的 DB 名稱，確保 PWA 更新後資料永遠不流失
@@ -383,11 +371,6 @@
             const realDayOfWeek = useMemo(() => realToday.getDay() || 7, [realToday]);
             const formattedDate = useMemo(() => `${realToday.getFullYear()}年${realToday.getMonth() + 1}月${realToday.getDate()}日`, [realToday]);
 
-            const baseDays = useMemo(() => [
-                { id: 1, label: '一' }, { id: 2, label: '二' }, { id: 3, label: '三' },
-                { id: 4, label: '四' }, { id: 5, label: '五' }, { id: 6, label: '六' }, { id: 7, label: '日' },
-            ], []);
-
             const daysWithDates = useMemo(() => {
                 const monday = new Date(realToday);
                 monday.setDate(realToday.getDate() - (realDayOfWeek - 1));
@@ -397,7 +380,7 @@
                     const fullDateStr = getYYYYMMDD(d);
                     return { ...day, dateStr: `${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')}`, fullDateStr };
                 });
-            }, [realToday, realDayOfWeek, baseDays]);
+            }, [realToday, realDayOfWeek]);
 
             const [selectedDay, setSelectedDay] = useState(realDayOfWeek); 
             const activeDateStr = useMemo(() => daysWithDates.find(d => d.id === selectedDay)?.fullDateStr, [selectedDay, daysWithDates]);
@@ -1025,17 +1008,142 @@
                 setRewards(updated); robustSave(STORAGE_KEYS.REWARDS, STORAGE_KEYS.REWARDS + '_bak', updated); setEditingRewardId(null);
             };
 
-            const handleAIPhotoUpload = (e) => {
-                if(e.target.files && e.target.files[0]) {
-                    setIsAnalyzingPhoto(true);
-                    setTimeout(() => {
-                        setNewEventTitle('學校測驗 (AI辨識成功)');
-                        setNewEventType('school');
+            // 【真・AI 視覺辨識引擎上線】
+            const handleAIPhotoUpload = async (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+                
+                setIsAnalyzingPhoto(true);
+                const reader = new FileReader();
+                
+                reader.onload = async (event) => {
+                    try {
+                        const base64Data = event.target.result.split(',')[1];
+                        const mimeType = file.type || "image/jpeg";
+                        
+                        const apiKey = "AIzaSyCa3a5xaVGJQAtbNzNqeQgZs7aRufB0zcI"; 
+                        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
+                        
+                        const promptText = `這是一張學校行事曆、聯絡簿或考試通知單。請提取出圖片中【所有的】重要行事、考試或活動。
+
+【日期轉換規則（非常重要）】：
+1. 圖片的表格通常有「月」和「日」欄位（例如：月 4，日 21）。
+2. 請結合月份與日期，並將年份預設為 2026 年（民國114學年度下學期 = 2026年），組成 "YYYY-MM-DD" 的格式。
+   例如：「4月21日」轉換為 "2026-04-21"。
+   例如：「2月23日」轉換為 "2026-02-23"。
+3. 若遇到連續假期或多天考試（例如：4月2日~4月6日），請以【第一天】作為該事件的日期，或自行拆分成多筆。
+
+【JSON 輸出格式要求】：
+請以純 JSON 陣列格式回傳，範例如下：
+[
+  {
+    "dateStr": "2026-04-21",
+    "title": "期中定期評量-第一天",
+    "type": "school" 
+  }
+]
+- type 只能精確選擇: "school" (學校考試/活動), "aftercare" (安親班), "gloria" (英文), "leave" (放假/補假)。若是放假請標示為 "leave"。
+- 務必只回傳純 JSON 陣列，不要加入任何其他文字說明或 markdown 標籤。`;
+
+                        const payload = {
+                            contents: [{
+                                role: "user",
+                                parts: [
+                                    { text: promptText },
+                                    { inlineData: { mimeType: mimeType, data: base64Data } }
+                                ]
+                            }],
+                            generationConfig: {
+                                responseMimeType: "application/json",
+                                responseSchema: {
+                                    type: "ARRAY",
+                                    items: {
+                                        type: "OBJECT",
+                                        properties: {
+                                            dateStr: { type: "STRING" },
+                                            title: { type: "STRING" },
+                                            type: { type: "STRING" }
+                                        },
+                                        required: ["dateStr", "title", "type"]
+                                    }
+                                }
+                            }
+                        };
+
+                        const fetchWithRetry = async (url, options, maxRetries = 5) => {
+                            let delays = [1000, 2000, 4000, 8000, 16000];
+                            for (let i = 0; i < maxRetries; i++) {
+                                try {
+                                    const response = await fetch(url, options);
+                                    if (!response.ok) {
+                                        const errText = await response.text();
+                                        throw new Error(`HTTP ${response.status}: ${errText}`);
+                                    }
+                                    return await response.json();
+                                } catch (error) {
+                                    if (i === maxRetries - 1) throw error;
+                                    await new Promise(r => setTimeout(r, delays[i]));
+                                }
+                            }
+                        };
+
+                        const result = await fetchWithRetry(url, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(payload)
+                        });
+                        
+                        let jsonText = result.candidates?.[0]?.content?.parts?.[0]?.text || "[]";
+                        jsonText = jsonText.replace(/```json/g, '').replace(/```/g, '').trim();
+
+                        const extractedEvents = JSON.parse(jsonText);
+
+                        if (Array.isArray(extractedEvents) && extractedEvents.length > 0) {
+                            const newEvents = extractedEvents.map(ev => {
+                                let evType = 'school';
+                                if (['school', 'aftercare', 'gloria', 'leave'].includes(ev.type)) {
+                                    evType = ev.type;
+                                }
+                                let evDate = ev.dateStr;
+                                if (!evDate || !/^\d{4}-\d{2}-\d{2}$/.test(evDate)) {
+                                    evDate = selectedEventDate; 
+                                }
+
+                                return {
+                                    id: Date.now().toString() + Math.random().toString(36).substr(2, 5),
+                                    dateStr: evDate,
+                                    type: evType,
+                                    title: ev.title || '未知事件'
+                                };
+                            });
+
+                            setEvents(prev => {
+                                const updated = [...prev, ...newEvents];
+                                robustSave(STORAGE_KEYS.EVENTS, STORAGE_KEYS.EVENTS + '_bak', updated);
+                                return updated;
+                            });
+                            playSound('tada');
+                            alert(`✅ AI 辨識成功！共提取並匯入 ${newEvents.length} 筆行事曆紀錄。`);
+                            setShowEventModal(false);
+                        } else {
+                            alert("⚠️ AI 分析完畢，但無法從圖片中找到明確的日期與事項。");
+                        }
+                    } catch (err) {
+                        console.error("AI Error:", err);
+                        alert("❌ AI 辨識發生錯誤：" + (err.message || "發生未知錯誤，請稍後再試。"));
+                    } finally {
                         setIsAnalyzingPhoto(false);
-                        playSound('tada');
-                        if(e.target) e.target.value = '';
-                    }, 1500);
-                }
+                        if (e.target) e.target.value = '';
+                    }
+                };
+                
+                reader.onerror = () => {
+                    alert("❌ 圖片讀取失敗");
+                    setIsAnalyzingPhoto(false);
+                    if (e.target) e.target.value = '';
+                };
+                
+                reader.readAsDataURL(file);
             };
 
             // 家長安全登入邏輯
@@ -1267,7 +1375,7 @@
             };
 
             return (
-                <div className="app-container" onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd}>
+                <div className="app-container h-[100dvh] w-screen overflow-hidden bg-slate-200 flex justify-center" onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd}>
                     
                     <input type="file" accept="image/*" capture="environment" ref={cameraInputRef} className="hidden" onChange={handleAIPhotoUpload} />
                     <input type="file" accept="image/*" ref={galleryInputRef} className="hidden" onChange={handleAIPhotoUpload} />
@@ -1417,7 +1525,7 @@
                         </div>
                     )}
 
-                    <div className="w-full max-w-4xl flex flex-col h-full relative shadow-2xl bg-white border-x-4 border-slate-200">
+                    <div className="w-full max-w-4xl flex flex-col h-full relative shadow-2xl bg-white border-x border-slate-200">
                         
                         {/* 家長登入鎖定遮罩 */}
                         {mode === 'parent' && !isParentAuth && (
@@ -1478,7 +1586,7 @@
                             </div>
                         </div>
 
-                        <div className="main-card relative bg-slate-50 flex flex-col flex-1 min-h-0">
+                        <div className="flex flex-col flex-1 min-h-0 relative bg-slate-50">
                             {/* 洋洋模式內容 */}
                             {mode === 'kid' && (
                                 <div className="flex flex-col h-full relative min-h-0 flex-1">
@@ -1598,7 +1706,7 @@
                                         </div>
                                     )}
 
-                                    <div className="flex-1 min-h-0 overflow-y-auto bg-slate-50 relative z-0 flex flex-col pt-2">
+                                    <div className="flex-1 min-h-0 overflow-y-auto bg-slate-50 relative z-0 flex flex-col pt-2 pb-20">
                                         {kidTab === 'tasks' && (
                                             <div className="p-3 md:p-8 touch-pan-y h-full">
                                                 <div ref={kidListRef} className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-6 relative pb-10">
@@ -1739,7 +1847,7 @@
                                                         </div>
                                                     </div>
                                                 </div>
-                                                <div className="w-full max-w-3xl mx-auto mt-4 p-4 border border-slate-200 bg-white rounded-2xl shadow-sm">
+                                                <div className="w-full max-w-3xl mx-auto mt-4 p-4 border border-slate-200 bg-white rounded-2xl shadow-sm pb-10">
                                                     <div className="flex justify-between items-center mb-3">
                                                         <h4 className="text-sm font-black text-slate-500 flex items-center gap-2"><Icon name="ListTodo" className="w-4 h-4"/> 當月事件清單</h4>
                                                     </div>
@@ -1750,6 +1858,7 @@
                                                                     <span className="text-xs font-black px-2 py-1 rounded bg-white/70 shadow-sm shrink-0">{e.dateStr.substring(5)}</span>
                                                                     <span className="text-xs font-black px-2 py-1 rounded bg-white/70 shadow-sm shrink-0">{EVENT_TYPES[e.type].label}</span>
                                                                     <span className="font-bold text-sm flex-1">{e.title}</span>
+                                                                    <button onClick={() => { const updated = events.filter(ev => ev.id !== e.id); setEvents(updated); robustSave(STORAGE_KEYS.EVENTS, STORAGE_KEYS.EVENTS + '_bak', updated); playSound('uncheck'); }} className="p-1.5 hover:bg-white/50 rounded-lg shrink-0"><Icon name="Trash2" className="w-4 h-4" /></button>
                                                                 </div>
                                                             ))
                                                         ) : (
