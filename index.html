@@ -390,6 +390,7 @@
             const [settingOldPin, setSettingOldPin] = useState('');
             const [settingNewPin, setSettingNewPin] = useState('');
             const [hasBioBound, setHasBioBound] = useState(false);
+            const [systemApiKey, setSystemApiKey] = useState(() => localStorage.getItem('yang_api_key') || '');
 
             // 分析狀態
             const [analysisSubject, setAnalysisSubject] = useState('');
@@ -1133,6 +1134,13 @@
                 const file = e.target.files[0];
                 if (!file) return;
                 
+                const savedApiKey = localStorage.getItem('yang_api_key');
+                if (!savedApiKey) {
+                    setSystemMsg("❌ 請先切換到「系統管理與設定 > 系統設定」分頁，在最下方填入並儲存您的 AI API Key！\n\n(因為直接寫在程式碼會被 GitHub 自動偵測並封鎖，所以改成由設定頁面輸入)");
+                    if (e.target) e.target.value = '';
+                    return;
+                }
+
                 setIsAnalyzingPhoto(true);
                 const reader = new FileReader();
                 
@@ -1141,9 +1149,8 @@
                         const base64Data = event.target.result.split(',')[1];
                         const mimeType = file.type || "image/jpeg";
                         
-                        const apiKey = "AIzaSyCa3a5xaVGJQAtbNzNqeQgZs7aRufB0zcI"; 
-                        // 改用 gemini-2.0-flash，解決 404 API 報錯問題
-                        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+                        // 改用 gemini-1.5-flash，解決 404 API 報錯問題，且支援 JSON schema
+                        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${savedApiKey}`;
                         
                         const promptText = `這是一張學校行事曆、聯絡簿或考試通知單。請提取出圖片中【所有的】重要行事、考試或活動。
 
@@ -1152,8 +1159,8 @@
 2. 請結合月份與日期，並將年份預設為 2026 年（民國114學年度下學期 = 2026年），組成 "YYYY-MM-DD" 的格式。
    例如：「4月21日」轉換為 "2026-04-21"。
    例如：「2月23日」轉換為 "2026-02-23"。
-3. 若遇到連續假期或跨日活動（例如：兒童節放假 4/3 ~ 4/6），請將每一天都拆解成獨立的一筆記錄。
-   必須回傳: 
+3. 若遇到連續假期或跨日活動（例如：兒童節放假 4/3 ~ 4/6 或寫作 3-6），請將每一天都拆解成獨立的一筆記錄。
+   例如看到 4 月 3-6 日（4月3日到4月6日），必須回傳: 
    {"dateStr": "2026-04-03", "title": "兒童節連假"}
    {"dateStr": "2026-04-04", "title": "兒童節連假"}
    {"dateStr": "2026-04-05", "title": "兒童節連假"}
@@ -1325,7 +1332,7 @@
                         publicKey: {
                             challenge, rp: { name: "洋洋作息表" }, user: { id: userID, name: "Parent", displayName: "家長" },
                             pubKeyCredParams: [{ type: "public-key", alg: -7 }, { type: "public-key", alg: -257 }],
-                            authenticatorSelection: { authenticatorAttachment: "platform", userVerification: "required" },
+                            authenticatorSelection: { authenticatorAttachment: "platform", userVerification: "preferred" },
                             timeout: 60000
                         }
                     });
@@ -1345,7 +1352,7 @@
                     const challenge = new Uint8Array(32); window.crypto.getRandomValues(challenge);
                     
                     await navigator.credentials.get({
-                        publicKey: { challenge, allowCredentials: [{ type: "public-key", id: idArray }], userVerification: "required" }
+                        publicKey: { challenge, allowCredentials: [{ type: "public-key", id: idArray }], userVerification: "preferred" }
                     });
                     setIsParentAuth(true);
                     setLoginError('');
@@ -1481,7 +1488,7 @@
                                 <h3 className="font-black text-slate-700 flex items-center gap-2"><Icon name="ChartLine" className="w-5 h-5 text-indigo-500"/> 單科歷次成績走勢</h3>
                                 <div className="flex items-center gap-2 bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-200">
                                     <label className="text-xs font-bold text-slate-500 whitespace-nowrap">自訂達標線：</label>
-                                    <input type="number" value={chartTargetScore} onChange={e => handleUpdateChartTarget(Number(e.target.value) || 0)} className="w-14 px-2 py-1 rounded font-bold text-center text-indigo-600 outline-none focus:ring-2 focus:ring-indigo-300" />
+                                    <input type="number" value={chartTargetScore} onChange={e => handleUpdateChartTarget(Number(e.target.value) || 0)} className="w-14 px-2 py-1 rounded font-bold text-center text-indigo-600 outline-none focus:ring-2 focus:ring-indigo-300 min-w-[4rem]" />
                                     <span className="text-xs font-bold text-slate-500">分</span>
                                 </div>
                             </div>
@@ -1587,7 +1594,7 @@
                     {/* 行事曆事件新增彈窗 */}
                     {showEventModal && (
                         <div className="fixed inset-0 z-[300] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => {if(!pendingAIEvents.length) setShowEventModal(false)}}>
-                            <div className="bg-white rounded-[2rem] p-6 w-full max-w-sm shadow-2xl animate-slide-down flex flex-col max-h-[85vh]" onClick={e => e.stopPropagation()}>
+                            <div className="bg-white rounded-[2rem] p-6 w-full max-w-sm shadow-2xl animate-slide-down flex flex-col max-h-[85vh] w-full" onClick={e => e.stopPropagation()}>
                                 <div className="flex justify-between items-center mb-4 shrink-0">
                                     <h3 className="text-xl font-black text-slate-800 flex items-center gap-2"><Icon name="Calendar" className="w-5 h-5 text-indigo-500" /> 行事曆記錄</h3>
                                     <button onClick={() => setShowEventModal(false)} className="text-slate-400 hover:text-slate-600 bg-slate-100 rounded-full w-8 h-8 flex items-center justify-center"><Icon name="X" className="w-5 h-5"/></button>
@@ -1612,11 +1619,11 @@
                                                         const newTitle = e.target.value;
                                                         setPendingAIEvents(prev => prev.map(p => p.id === ev.id ? {...p, title: newTitle} : p));
                                                     }}
-                                                    className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 font-bold outline-none focus:border-indigo-400 focus:bg-white"
+                                                    className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 font-bold outline-none focus:border-indigo-400 focus:bg-white min-w-0"
                                                 />
                                             </div>
                                         ))}
-                                        <div className="flex gap-2 mt-4 shrink-0">
+                                        <div className="flex gap-2 mt-4 shrink-0 w-full">
                                             <button onClick={confirmAIEvents} className="flex-1 bg-indigo-600 text-white py-3 rounded-xl font-black text-base shadow-md hover:bg-indigo-700 transition-colors">確認並新增</button>
                                             <button onClick={() => setPendingAIEvents([])} className="flex-1 bg-slate-200 text-slate-600 py-3 rounded-xl font-black text-base hover:bg-slate-300 transition-colors">取消</button>
                                         </div>
@@ -1624,7 +1631,7 @@
                                 ) : (
                                     <div className="flex-1 overflow-y-auto no-scrollbar pb-2">
                                         {mode === 'parent' && (
-                                            <div className="space-y-5 mb-5">
+                                            <div className="space-y-5 mb-5 w-full">
                                                 <div>
                                                     <label className="block text-xs font-black text-slate-400 uppercase tracking-wider mb-2">1. 選擇分類 (分類標籤)</label>
                                                     <div className="grid grid-cols-3 gap-2">
@@ -1642,7 +1649,7 @@
 
                                                 <div className="bg-indigo-50/50 p-3 rounded-2xl border border-indigo-100">
                                                     <label className="block text-xs font-black text-indigo-500 uppercase tracking-wider mb-2">2. AI 智慧掃描 (自動填寫)</label>
-                                                    <div className="flex gap-2">
+                                                    <div className="flex gap-2 w-full">
                                                         <button onClick={() => cameraInputRef.current.click()} disabled={isAnalyzingPhoto} className="flex-1 bg-white text-indigo-600 border border-indigo-200 py-2.5 rounded-xl font-bold text-sm hover:bg-indigo-50 transition-colors shadow-sm flex justify-center items-center gap-2">
                                                             {isAnalyzingPhoto ? <Icon name="Loader" className="animate-spin w-4 h-4" /> : <Icon name="Camera" className="w-4 h-4" />}
                                                             拍照
@@ -1663,10 +1670,10 @@
                                                     </div>
                                                 </div>
 
-                                                <div>
+                                                <div className="w-full">
                                                     <label className="block text-xs font-black text-slate-400 uppercase tracking-wider mb-2">手動新增事件</label>
-                                                    <div className="flex gap-2">
-                                                        <input type="text" value={newEventTitle} onChange={e=>setNewEventTitle(e.target.value)} onKeyDown={(e) => {if(e.key === 'Enter'){ const newEvt = { id: Date.now().toString(), dateStr: selectedEventDate, type: newEventType, title: newEventTitle.trim() }; const updated = [...events, newEvt]; setEvents(updated); robustSave(STORAGE_KEYS.EVENTS, STORAGE_KEYS.EVENTS + '_bak', updated); setNewEventTitle(''); playSound('check');}}} placeholder="輸入事項名稱..." className="flex-1 bg-slate-50 border-2 border-slate-200 rounded-xl px-3 py-2 font-bold outline-none focus:border-indigo-400 focus:bg-white transition-colors" />
+                                                    <div className="flex gap-2 w-full">
+                                                        <input type="text" value={newEventTitle} onChange={e=>setNewEventTitle(e.target.value)} onKeyDown={(e) => {if(e.key === 'Enter'){ const newEvt = { id: Date.now().toString(), dateStr: selectedEventDate, type: newEventType, title: newEventTitle.trim() }; const updated = [...events, newEvt]; setEvents(updated); robustSave(STORAGE_KEYS.EVENTS, STORAGE_KEYS.EVENTS + '_bak', updated); setNewEventTitle(''); playSound('check');}}} placeholder="輸入事項名稱..." className="flex-1 bg-slate-50 border-2 border-slate-200 rounded-xl px-3 py-2 font-bold outline-none focus:border-indigo-400 focus:bg-white transition-colors min-w-0" />
                                                         <button onClick={() => { if (!newEventTitle.trim()) return; const newEvt = { id: Date.now().toString(), dateStr: selectedEventDate, type: newEventType, title: newEventTitle.trim() }; const updated = [...events, newEvt]; setEvents(updated); robustSave(STORAGE_KEYS.EVENTS, STORAGE_KEYS.EVENTS + '_bak', updated); setNewEventTitle(''); playSound('check'); }} className="bg-indigo-500 text-white px-4 py-2 rounded-xl font-black shadow-md hover:bg-indigo-600 transition-colors active:scale-95 shrink-0 flex items-center gap-1">
                                                             <Icon name="Plus" className="w-4 h-4" /> 新增
                                                         </button>
@@ -1680,12 +1687,12 @@
                         </div>
                     )}
 
-                    {/* 考試紀錄彈窗 */}
+                    {/* 考試紀錄彈窗 (洋洋與家長共用) */}
                     {showExamModal && (
                         <div className="fixed inset-0 z-[300] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setShowExamModal(false)}>
                             <div className="bg-white rounded-[2rem] p-6 w-full max-w-sm shadow-2xl animate-slide-down flex flex-col max-h-[85vh]" onClick={e => e.stopPropagation()}>
                                 <h3 className="text-2xl font-black text-slate-800 mb-4 text-center shrink-0">📝 記錄考試成績</h3>
-                                <div className="space-y-4 mb-6 overflow-y-auto pr-1 flex-1 no-scrollbar">
+                                <div className="space-y-4 mb-6 overflow-y-auto pr-1 flex-1 no-scrollbar w-full">
                                     <div>
                                         <label className="block text-sm font-bold text-slate-500 mb-2">考試日期</label>
                                         <input type="date" value={examDate} onChange={e=>setExamDate(e.target.value)} className="w-full bg-slate-50 border-2 border-slate-200 rounded-xl px-4 py-2 font-bold outline-none focus:border-yellow-400 focus:bg-white transition-colors" />
@@ -1724,9 +1731,9 @@
                                             ))}
                                         </div>
                                         {(!examUnitPrefix.endsWith('考') && !examUnitPrefix.endsWith('測驗')) && (
-                                            <div className="flex items-center gap-2 mt-2 bg-slate-50 border-2 border-slate-200 rounded-xl px-4 py-2 focus-within:border-yellow-400 focus-within:bg-white transition-colors">
+                                            <div className="flex items-center gap-2 mt-2 bg-slate-50 border-2 border-slate-200 rounded-xl px-4 py-2 focus-within:border-yellow-400 focus-within:bg-white transition-colors w-full">
                                                 <span className="font-black text-slate-600 shrink-0">第</span>
-                                                <input type="text" value={examUnitNumber} onChange={e=>setExamUnitNumber(e.target.value)} placeholder="輸入範圍(如: 1~3)" className="bg-transparent font-black outline-none w-full text-center text-lg text-yellow-600 min-w-[80px]" />
+                                                <input type="text" value={examUnitNumber} onChange={e=>setExamUnitNumber(e.target.value)} placeholder="輸入範圍(如: 1~3)" className="bg-transparent font-black outline-none w-full text-center text-lg text-yellow-600 min-w-0 flex-1" />
                                                 <span className="font-black text-slate-600 shrink-0">{examUnitPrefix}</span>
                                             </div>
                                         )}
@@ -1736,7 +1743,7 @@
                                         <input type="number" value={examScore} onChange={e=>setExamScore(e.target.value)} placeholder="0 ~ 100" className="w-full bg-slate-50 border-2 border-slate-200 rounded-xl px-4 py-3 font-black text-3xl text-center outline-none focus:border-yellow-400 focus:bg-white transition-colors text-yellow-600" />
                                     </div>
                                 </div>
-                                <div className="flex gap-3 shrink-0 pt-2">
+                                <div className="flex gap-3 shrink-0 pt-2 w-full">
                                     <button onClick={handleAddExam} className="flex-1 bg-yellow-400 text-white py-3 rounded-xl font-black text-lg shadow-md hover:bg-yellow-500 transition-colors active:scale-95">存檔</button>
                                     <button onClick={() => setShowExamModal(false)} className="flex-1 bg-slate-200 text-slate-600 py-3 rounded-xl font-black text-lg hover:bg-slate-300 transition-colors active:scale-95">取消</button>
                                 </div>
@@ -1961,7 +1968,7 @@
                                                                 <div key={task.id} onClick={() => toggleItem(task.id)}
                                                                     className={`h-full cursor-pointer transition-all duration-300 origin-center ${teleportingCards[task.id] ? 'scale-50 opacity-0' : 'scale-100 opacity-100'}`}
                                                                 >
-                                                                    <div className={`task-inner h-full border-2 p-4 md:p-6 rounded-[1.5rem] md:rounded-[2.5rem] flex items-center gap-4 transition-all duration-300 ${
+                                                                    <div className={`task-inner h-full border-2 p-4 md:p-6 rounded-[1.5rem] md:rounded-[2.5rem] flex flex-col sm:flex-row items-center sm:items-start md:items-center gap-3 md:gap-4 transition-all duration-300 ${
                                                                         celebratingCards[task.id] 
                                                                             ? 'bg-white animate-happy-dance' 
                                                                             : isChecked && !teleportingCards[task.id]
@@ -1978,8 +1985,8 @@
                                                                                 <div className="w-12 h-12 md:w-14 md:h-14 rounded-2xl border-[6px] md:border-[8px] transition-all duration-300 relative z-10 border-orange-50" />
                                                                             )}
                                                                         </div>
-                                                                        <div className="flex-1 overflow-hidden text-left">
-                                                                            <p className={`text-base sm:text-lg md:text-2xl font-black leading-snug tracking-tighter break-words transition-all duration-300 ${
+                                                                        <div className="flex-1 overflow-hidden w-full text-center sm:text-left">
+                                                                            <p className={`text-base sm:text-lg md:text-2xl font-black leading-snug tracking-tighter break-words hyphens-auto transition-all duration-300 ${
                                                                                 isChecked && !celebratingCards[task.id] && !teleportingCards[task.id] ? 'text-slate-400' : 'text-slate-800'
                                                                             }`}>
                                                                             {task.title}
@@ -2004,7 +2011,7 @@
                                                     <div className="mb-6 bg-gradient-to-r from-orange-50 to-yellow-100 border-2 border-yellow-300 rounded-2xl p-4 shadow-sm animate-bounce-fast">
                                                         <h4 className="font-black text-orange-600 flex items-center gap-2 mb-2 text-lg"><Icon name="Gift"/> 恭喜！你有可以兌換的獎勵！</h4>
                                                         {kidExamRewards.map(r => (
-                                                            <div key={r.periodId} className="bg-white/80 rounded-lg px-3 py-2 text-sm font-bold text-orange-800 mb-1 shadow-sm">
+                                                            <div key={r.periodId} className="bg-white/80 rounded-lg px-3 py-2 text-sm font-bold text-orange-800 mb-1 shadow-sm break-words">
                                                                 👉 {r.label} {r.count > 1 && <span className="ml-1 text-red-500 font-black">(x{r.count})</span>}
                                                             </div>
                                                         ))}
@@ -2016,7 +2023,7 @@
                                                         <Icon name="Award" className="w-6 h-6 md:w-8 md:h-8 text-yellow-500" /> {selectedExamDateStr.split('-').slice(1).join('/')} 考試
                                                     </h3>
                                                     {selectedExamDateStr <= getYYYYMMDD(realToday) && (
-                                                        <button onClick={() => { setExamDate(selectedExamDateStr.replace(/\//g, "-")); setExamCategory('學校'); setExamSubject(''); setExamType(''); setExamUnitPrefix('單元'); setExamUnitNumber(''); setExamScore(''); setShowExamModal(true); }} className="bg-yellow-400 hover:bg-yellow-500 text-white px-4 py-2 md:px-5 md:py-3 rounded-2xl font-black shadow-md transition-transform active:scale-95 flex items-center gap-2 shrink-0">
+                                                        <button onClick={() => { setExamDate(selectedExamDateStr.replace(/\//g, "-")); setExamCategory('學校'); setExamSubject(''); setExamType(''); setExamUnitPrefix(''); setExamUnitNumber(''); setExamScore(''); setShowExamModal(true); }} className="bg-yellow-400 hover:bg-yellow-500 text-white px-4 py-2 md:px-5 md:py-3 rounded-2xl font-black shadow-md transition-transform active:scale-95 flex items-center gap-2 shrink-0">
                                                             <Icon name="Plus" className="w-5 h-5" /> 記錄
                                                         </button>
                                                     )}
@@ -2026,19 +2033,19 @@
                                                         activeExams.map(exam => {
                                                             const typeName = typeof exam.type === 'string' ? exam.type : (examTypes.find(t => t.id === exam.type)?.name || '未知');
                                                             return (
-                                                                <div key={exam.id} className="bg-white border-2 border-yellow-100 p-5 rounded-[2rem] flex justify-between items-center shadow-sm relative overflow-hidden group">
+                                                                <div key={exam.id} className="bg-white border-2 border-yellow-100 p-5 rounded-[2rem] flex items-center shadow-sm relative overflow-hidden group w-full gap-3">
                                                                     <div className="absolute -right-4 -bottom-4 opacity-10 pointer-events-none"><Icon name="Award" className="w-32 h-32 text-yellow-600" /></div>
-                                                                    <div>
+                                                                    <div className="flex-1 min-w-0">
                                                                         <div className="flex items-center gap-2 mb-1">
-                                                                            <span className="text-[10px] bg-yellow-100 text-yellow-700 px-2 py-1 rounded font-bold">{typeName}</span>
+                                                                            <span className="text-[10px] bg-yellow-100 text-yellow-700 px-2 py-1 rounded font-bold truncate">{typeName}</span>
                                                                         </div>
-                                                                        <span className="font-black text-slate-700 text-2xl relative z-10 flex items-baseline gap-2">
-                                                                            {exam.subject}
-                                                                            {exam.unit && <span className="text-lg text-slate-500 font-bold">{exam.unit}</span>}
+                                                                        <span className="font-black text-slate-700 text-xl md:text-2xl relative z-10 flex items-baseline gap-2 truncate max-w-full">
+                                                                            <span className="truncate">{exam.subject}</span>
+                                                                            {exam.unit && <span className="text-sm md:text-lg text-slate-500 font-bold truncate shrink-0">{exam.unit}</span>}
                                                                         </span>
                                                                     </div>
-                                                                    <div className="flex flex-col items-end shrink-0">
-                                                                        <span className={`font-black text-4xl relative z-10 tabular-nums ${exam.score >= 90 ? 'text-red-500 drop-shadow-sm' : 'text-yellow-600'}`}>{exam.score}<span className="text-xl ml-1">分</span></span>
+                                                                    <div className="flex flex-col items-end shrink-0 pl-2">
+                                                                        <span className={`font-black text-3xl md:text-4xl relative z-10 tabular-nums ${exam.score >= 90 ? 'text-red-500 drop-shadow-sm' : 'text-yellow-600'}`}>{exam.score}<span className="text-lg md:text-xl ml-1">分</span></span>
                                                                         {exam.score === 100 && <span className="text-[10px] text-red-500 font-bold mt-1 bg-red-50 px-2 py-0.5 rounded-full border border-red-100 whitespace-nowrap">💯 完美滿分！</span>}
                                                                         {exam.score >= 90 && exam.score < 100 && <span className="text-[10px] text-orange-500 font-bold mt-1 bg-orange-50 px-2 py-0.5 rounded-full border border-orange-100 whitespace-nowrap">🌟 表現優異！</span>}
                                                                     </div>
@@ -2080,11 +2087,11 @@
                                                                         {day.events && day.events.length > 0 && (
                                                                             <div className="flex flex-col gap-0.5 mt-1 w-full px-1 overflow-hidden items-center">
                                                                                 {day.events.slice(0, 2).map((e, i) => (
-                                                                                    <div key={i} className={`text-[10px] md:text-xs px-1.5 py-0.5 rounded shadow-sm font-bold truncate max-w-[95%] ${EVENT_TYPES[e.type]?.color || 'bg-slate-100'}`}>
+                                                                                    <div key={i} className={`text-[10px] md:text-[11px] px-1.5 py-0.5 rounded shadow-sm font-bold truncate w-full text-center ${EVENT_TYPES[e.type]?.color || 'bg-slate-100'}`}>
                                                                                         {EVENT_TYPES[e.type]?.label || '自訂'}
                                                                                     </div>
                                                                                 ))}
-                                                                                {day.events.length > 2 && <div className="text-[10px] text-slate-500 font-bold text-center">+{day.events.length - 2}</div>}
+                                                                                {day.events.length > 2 && <div className="text-[10px] text-slate-500 font-bold text-center w-full bg-slate-100 rounded shadow-sm">+{day.events.length - 2}</div>}
                                                                             </div>
                                                                         )}
                                                                     </div>
@@ -2100,10 +2107,12 @@
                                                     <div className="space-y-2">
                                                         {parentCalendarData.data.filter(d => d && d.events.length > 0).map(d => d.events).flat().length > 0 ? (
                                                             parentCalendarData.data.filter(d => d && d.events.length > 0).map(d => d.events).flat().sort((a,b) => a.dateStr.localeCompare(b.dateStr)).map(e => (
-                                                                <div key={e.id} className={`flex items-center gap-3 p-3 rounded-xl border group ${EVENT_TYPES[e.type]?.color || 'bg-slate-100'}`}>
-                                                                    <span className="text-xs font-black px-2 py-1 rounded bg-white/70 shadow-sm shrink-0">{e.dateStr.substring(5)}</span>
-                                                                    <span className="text-xs font-black px-2 py-1 rounded bg-white/70 shadow-sm shrink-0">{EVENT_TYPES[e.type]?.label || '自訂'}</span>
-                                                                    <span className="font-bold text-sm flex-1 truncate">{e.title}</span>
+                                                                <div key={e.id} className={`flex flex-col sm:flex-row sm:items-center gap-2 p-3 rounded-xl border group ${EVENT_TYPES[e.type]?.color || 'bg-slate-100'}`}>
+                                                                    <div className="flex items-center gap-2 shrink-0">
+                                                                        <span className="text-xs font-black px-2 py-1 rounded bg-white/70 shadow-sm">{e.dateStr.substring(5)}</span>
+                                                                        <span className="text-xs font-black px-2 py-1 rounded bg-white/70 shadow-sm">{EVENT_TYPES[e.type]?.label || '自訂'}</span>
+                                                                    </div>
+                                                                    <span className="font-bold text-sm flex-1 break-words min-w-0 w-full px-1">{e.title}</span>
                                                                 </div>
                                                             ))
                                                         ) : (
@@ -2274,16 +2283,16 @@
                                                                 </div>
                                                             )}
                                                             <div className="flex flex-col md:flex-row md:items-center gap-2 md:gap-4">
-                                                                <div className="flex items-center gap-2 flex-1">
+                                                                <div className="flex items-center gap-2 flex-1 w-full">
                                                                     <div className="w-8 h-8 rounded shrink-0 bg-slate-100 flex items-center justify-center drag-handle touch-none cursor-grab text-slate-400 hover:text-indigo-600 hover:bg-indigo-50">
                                                                         <Icon name="GripVertical" className="w-5 h-5 pointer-events-none" />
                                                                     </div>
-                                                                    <input value={task.title} onChange={(e) => updateTask(task.id, 'title', e.target.value)} className="flex-1 text-base md:text-lg font-bold bg-transparent border border-slate-100 hover:border-slate-300 focus:border-indigo-400 focus:bg-slate-50 rounded px-3 py-1.5 outline-none transition-all placeholder:text-slate-300" placeholder="輸入作息名稱" />
+                                                                    <input value={task.title} onChange={(e) => updateTask(task.id, 'title', e.target.value)} className="flex-1 text-base md:text-lg font-bold bg-transparent border border-slate-100 hover:border-slate-300 focus:border-indigo-400 focus:bg-slate-50 rounded px-3 py-1.5 outline-none transition-all placeholder:text-slate-300 min-w-[150px] w-full" placeholder="輸入作息名稱" />
                                                                 </div>
-                                                                <div className="flex items-center justify-between md:justify-end gap-3 pl-10 md:pl-0">
-                                                                    <div className="flex gap-1">
+                                                                <div className="flex items-center justify-between md:justify-end gap-3 pl-10 md:pl-0 w-full md:w-auto">
+                                                                    <div className="flex flex-wrap justify-end gap-1 flex-1">
                                                                         {baseDays.map(d => (
-                                                                            <button key={d.id} onClick={() => toggleTaskRule(task.id, d.id)} className={`w-7 h-7 md:w-8 md:h-8 rounded text-[10px] md:text-xs font-black transition-all ${task.rule.includes(d.id) ? 'bg-indigo-600 text-white shadow-sm' : 'bg-slate-100 text-slate-400 hover:bg-slate-200'}`}>{d.label}</button>
+                                                                            <button key={d.id} onClick={() => toggleTaskRule(task.id, d.id)} className={`w-7 h-7 md:w-8 md:h-8 rounded text-[10px] md:text-xs font-black transition-all shrink-0 ${task.rule.includes(d.id) ? 'bg-indigo-600 text-white shadow-sm' : 'bg-slate-100 text-slate-400 hover:bg-slate-200'}`}>{d.label}</button>
                                                                         ))}
                                                                     </div>
                                                                     <button onClick={() => setDeleteConfirmId(task.id)} className="p-1.5 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded shrink-0 transition-all md:opacity-0 group-hover:opacity-100">
@@ -2325,11 +2334,11 @@
                                                                         {day.events && day.events.length > 0 && (
                                                                             <div className="flex flex-col gap-0.5 mt-1 w-full px-1 overflow-hidden items-center">
                                                                                 {day.events.slice(0, 2).map((e, i) => (
-                                                                                    <div key={i} className={`text-[10px] md:text-xs px-1.5 py-0.5 rounded shadow-sm font-bold truncate max-w-[95%] ${EVENT_TYPES[e.type]?.color || 'bg-slate-100'}`}>
+                                                                                    <div key={i} className={`text-[10px] md:text-[11px] px-1.5 py-0.5 rounded shadow-sm font-bold truncate max-w-[95%] text-center ${EVENT_TYPES[e.type]?.color || 'bg-slate-100'}`}>
                                                                                         {EVENT_TYPES[e.type]?.label || '自訂'}
                                                                                     </div>
                                                                                 ))}
-                                                                                {day.events.length > 2 && <div className="text-[10px] text-slate-500 font-bold text-center">+{day.events.length - 2}</div>}
+                                                                                {day.events.length > 2 && <div className="text-[10px] text-slate-500 font-bold text-center w-full bg-slate-100 rounded shadow-sm">+{day.events.length - 2}</div>}
                                                                             </div>
                                                                         )}
                                                                     </div>
@@ -2345,32 +2354,38 @@
                                                     <div className="space-y-2">
                                                         {parentCalendarData.data.filter(d => d && d.events.length > 0).map(d => d.events).flat().length > 0 ? (
                                                             parentCalendarData.data.filter(d => d && d.events.length > 0).map(d => d.events).flat().sort((a,b) => a.dateStr.localeCompare(b.dateStr)).map(e => (
-                                                                <div key={e.id} className={`flex items-center gap-3 p-3 rounded-xl border group ${EVENT_TYPES[e.type]?.color || 'bg-slate-100'}`}>
-                                                                    <span className="text-xs font-black px-2 py-1 rounded bg-white/70 shadow-sm shrink-0">{e.dateStr.substring(5)}</span>
-                                                                    <span className="text-xs font-black px-2 py-1 rounded bg-white/70 shadow-sm shrink-0">{EVENT_TYPES[e.type]?.label || '自訂'}</span>
+                                                                <div key={e.id} className={`flex flex-col sm:flex-row sm:items-center gap-3 p-3 rounded-xl border group ${EVENT_TYPES[e.type]?.color || 'bg-slate-100'}`}>
+                                                                    <div className="flex items-center gap-2 shrink-0">
+                                                                        <span className="text-xs font-black px-2 py-1 rounded bg-white/70 shadow-sm shrink-0">{e.dateStr.substring(5)}</span>
+                                                                        <span className="text-xs font-black px-2 py-1 rounded bg-white/70 shadow-sm shrink-0">{EVENT_TYPES[e.type]?.label || '自訂'}</span>
+                                                                    </div>
                                                                     
-                                                                    {editingEventId === e.id ? (
-                                                                        <div className="flex-1 flex items-center gap-2 overflow-hidden">
-                                                                            <input 
-                                                                                type="text" 
-                                                                                value={editEventTitle} 
-                                                                                onChange={(ev) => setEditEventTitle(ev.target.value)} 
-                                                                                onKeyDown={(ev) => ev.key === 'Enter' && saveEditEvent()}
-                                                                                className="flex-1 px-2 py-1 border border-indigo-300 rounded outline-none focus:ring-2 focus:ring-indigo-400 font-bold text-sm min-w-0"
-                                                                                autoFocus
-                                                                            />
-                                                                            <button onClick={saveEditEvent} className="bg-indigo-600 text-white p-1.5 rounded shadow-sm text-xs font-bold shrink-0"><Icon name="Check" className="w-4 h-4"/></button>
-                                                                            <button onClick={() => setEditingEventId(null)} className="bg-slate-200 text-slate-600 p-1.5 rounded text-xs font-bold shrink-0"><Icon name="X" className="w-4 h-4"/></button>
-                                                                        </div>
-                                                                    ) : (
-                                                                        <>
-                                                                            <span className="font-bold text-sm flex-1 truncate">{e.title}</span>
-                                                                            <div className="flex gap-1 shrink-0 opacity-100 transition-opacity">
-                                                                                <button onClick={() => { setEditingEventId(e.id); setEditEventTitle(e.title); }} className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors bg-white shadow-sm border border-slate-200"><Icon name="Edit2" className="w-4 h-4" /></button>
-                                                                                <button onClick={() => setEventToDelete(e)} className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors bg-white shadow-sm border border-slate-200"><Icon name="Trash2" className="w-4 h-4" /></button>
+                                                                    <div className="flex-1 flex items-center justify-between w-full sm:w-auto gap-2 min-w-0">
+                                                                        {editingEventId === e.id ? (
+                                                                            <div className="flex-1 flex flex-wrap sm:flex-nowrap items-center gap-2 overflow-hidden w-full">
+                                                                                <input 
+                                                                                    type="text" 
+                                                                                    value={editEventTitle} 
+                                                                                    onChange={(ev) => setEditEventTitle(ev.target.value)} 
+                                                                                    onKeyDown={(ev) => ev.key === 'Enter' && saveEditEvent()}
+                                                                                    className="flex-1 w-full sm:w-auto px-2 py-1.5 border border-indigo-300 rounded outline-none focus:ring-2 focus:ring-indigo-400 font-bold text-sm min-w-[120px]"
+                                                                                    autoFocus
+                                                                                />
+                                                                                <div className="flex gap-1 shrink-0 ml-auto">
+                                                                                    <button onClick={saveEditEvent} className="bg-indigo-600 text-white p-2 rounded shadow-sm text-xs font-bold"><Icon name="Check" className="w-4 h-4"/></button>
+                                                                                    <button onClick={() => setEditingEventId(null)} className="bg-slate-200 text-slate-600 p-2 rounded text-xs font-bold"><Icon name="X" className="w-4 h-4"/></button>
+                                                                                </div>
                                                                             </div>
-                                                                        </>
-                                                                    )}
+                                                                        ) : (
+                                                                            <>
+                                                                                <span className="font-bold text-sm truncate">{e.title}</span>
+                                                                                <div className="flex gap-1 shrink-0 opacity-100 transition-opacity">
+                                                                                    <button onClick={() => { setEditingEventId(e.id); setEditEventTitle(e.title); }} className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors bg-white shadow-sm border border-slate-200"><Icon name="Edit2" className="w-4 h-4" /></button>
+                                                                                    <button onClick={() => setEventToDelete(e)} className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors bg-white shadow-sm border border-slate-200"><Icon name="Trash2" className="w-4 h-4" /></button>
+                                                                                </div>
+                                                                            </>
+                                                                        )}
+                                                                    </div>
                                                                 </div>
                                                             ))
                                                         ) : (
@@ -2388,7 +2403,7 @@
                                                 <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
                                                     <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4 border-b pb-4">
                                                         <h3 className="font-black text-slate-700 flex items-center gap-2"><Icon name="Settings2" className="w-5 h-5"/> 考試科目與種類設定</h3>
-                                                        <div className="flex items-center gap-2 bg-slate-50 p-1.5 rounded-lg border border-slate-200">
+                                                        <div className="flex flex-wrap items-center gap-2 bg-slate-50 p-1.5 rounded-lg border border-slate-200">
                                                             <span className="text-sm font-bold text-slate-500 px-2 whitespace-nowrap">選擇編輯地點：</span>
                                                             <select value={examSettingCategory} onChange={e => { setExamSettingCategory(e.target.value); setCustomCatName(''); }} className="text-sm font-bold outline-none bg-white border border-slate-300 rounded px-2 py-1.5 shadow-sm">
                                                                 {activeCategories.map(c => <option key={c} value={c}>{c}</option>)}
@@ -2404,7 +2419,7 @@
                                                         <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 flex flex-col">
                                                             <label className="block text-sm font-black text-slate-600 mb-3 flex items-center gap-1"><Icon name="ListTodo" className="w-4 h-4 text-indigo-500" /> 1. 考試種類</label>
                                                             <div className="flex items-center gap-2 mb-4">
-                                                                <input value={newTypeNameInput} onChange={e=>setNewTypeNameInput(e.target.value)} onKeyDown={e=>e.key==='Enter' && handleAddType()} placeholder="輸入種類名稱" className="flex-1 text-sm border border-slate-300 rounded-lg px-3 h-10 outline-none focus:border-indigo-400 font-bold min-w-0" />
+                                                                <input value={newTypeNameInput} onChange={e=>setNewTypeNameInput(e.target.value)} onKeyDown={e=>e.key==='Enter' && handleAddType()} placeholder="輸入種類名稱" className="flex-1 text-sm border border-slate-300 rounded-lg px-3 h-10 outline-none focus:border-indigo-400 font-bold min-w-0 w-full" />
                                                                 <button onClick={handleAddType} className="bg-indigo-500 text-white h-10 px-4 rounded-lg font-black text-sm hover:bg-indigo-600 shrink-0 shadow-sm transition-colors">新增</button>
                                                             </div>
                                                             <div className="flex flex-col gap-3 max-h-96 overflow-y-auto custom-scrollbar pt-2 border-t border-slate-200 pr-2">
@@ -2429,7 +2444,7 @@
                                                         <div className="bg-yellow-50/50 p-4 rounded-xl border border-yellow-100 flex flex-col">
                                                             <label className="block text-sm font-black text-yellow-700 mb-3 flex items-center gap-1"><Icon name="Award" className="w-4 h-4" /> 2. 考試科目</label>
                                                             <div className="flex items-center gap-2 mb-4">
-                                                                <input value={newSubjectInput} onChange={e=>setNewSubjectInput(e.target.value)} onKeyDown={e=>e.key==='Enter' && handleAddSubject()} placeholder="新增科目" className="flex-1 text-sm border border-slate-300 rounded-lg px-3 h-10 outline-none focus:border-yellow-400 font-bold min-w-0" />
+                                                                <input value={newSubjectInput} onChange={e=>setNewSubjectInput(e.target.value)} onKeyDown={e=>e.key==='Enter' && handleAddSubject()} placeholder="新增科目" className="flex-1 text-sm border border-slate-300 rounded-lg px-3 h-10 outline-none focus:border-yellow-400 font-bold min-w-0 w-full" />
                                                                 <button onClick={handleAddSubject} className="bg-yellow-400 text-white h-10 px-4 rounded-lg font-black text-sm hover:bg-yellow-500 shadow-sm transition-colors shrink-0">新增</button>
                                                             </div>
                                                             <div className="flex flex-col gap-3 max-h-96 overflow-y-auto custom-scrollbar pt-2 border-t border-yellow-200/50 pr-2">
@@ -2454,7 +2469,7 @@
                                                         <div className="bg-emerald-50/50 p-4 rounded-xl border border-emerald-100 flex flex-col">
                                                             <label className="block text-sm font-black text-emerald-700 mb-3 flex items-center gap-1"><Icon name="ChartLine" className="w-4 h-4" /> 3. 單位/範圍字尾</label>
                                                             <div className="flex items-center gap-2 mb-4">
-                                                                <input value={newUnitInput} onChange={e=>setNewUnitInput(e.target.value)} onKeyDown={e=>e.key==='Enter' && handleAddUnit()} placeholder="新增單位(如:章)" className="flex-1 text-sm border border-slate-300 rounded-lg px-3 h-10 outline-none focus:border-emerald-400 font-bold min-w-0" />
+                                                                <input value={newUnitInput} onChange={e=>setNewUnitInput(e.target.value)} onKeyDown={e=>e.key==='Enter' && handleAddUnit()} placeholder="新增單位(如:章)" className="flex-1 text-sm border border-slate-300 rounded-lg px-3 h-10 outline-none focus:border-emerald-400 font-bold min-w-0 w-full" />
                                                                 <button onClick={handleAddUnit} className="bg-emerald-500 text-white h-10 px-4 rounded-lg font-black text-sm hover:bg-emerald-600 shadow-sm transition-colors shrink-0">新增</button>
                                                             </div>
                                                             <div className="flex flex-col gap-3 max-h-96 overflow-y-auto custom-scrollbar pt-2 border-t border-emerald-200/50 pr-2">
@@ -2481,46 +2496,52 @@
 
                                                 <div className="bg-indigo-50 p-5 rounded-2xl border border-indigo-100 shadow-sm">
                                                     <h3 className="font-black text-indigo-900 flex items-center gap-2 mb-4 border-b border-indigo-200 pb-2"><Icon name="Gift" className="w-5 h-5"/>考試自動獎勵規則</h3>
-                                                    <div className="flex flex-wrap gap-2 mb-4 items-end">
-                                                        <div>
+                                                    <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-5 gap-3 mb-4 items-end">
+                                                        <div className="flex flex-col w-full">
                                                             <label className="text-xs font-bold text-indigo-400 block mb-1">種類</label>
-                                                            <select value={newRuleType} onChange={e=>setNewRuleType(e.target.value)} className="block w-24 p-2 rounded-lg border outline-none font-bold text-sm bg-white">
+                                                            <select value={newRuleType} onChange={e=>setNewRuleType(e.target.value)} className="p-2 rounded-lg border outline-none font-bold text-sm bg-white w-full">
                                                                 <option value="不限">不限</option>{examTypes.map(t=><option key={t.id} value={t.id}>{t.name}</option>)}
                                                             </select>
                                                         </div>
-                                                        <div>
+                                                        <div className="flex flex-col w-full">
                                                             <label className="text-xs font-bold text-indigo-400 block mb-1">科目</label>
-                                                            <select value={newRuleSubject} onChange={e=>setNewRuleSubject(e.target.value)} className="block w-24 p-2 rounded-lg border outline-none font-bold text-sm bg-white">
+                                                            <select value={newRuleSubject} onChange={e=>setNewRuleSubject(e.target.value)} className="p-2 rounded-lg border outline-none font-bold text-sm bg-white w-full">
                                                                 <option value="不限">不限</option>{examSubjects.map(s=><option key={s.id} value={s.name}>{s.name}</option>)}
                                                             </select>
                                                         </div>
-                                                        <div>
+                                                        <div className="flex flex-col w-full">
                                                             <label className="text-xs font-bold text-indigo-400 block mb-1">達標分數</label>
-                                                            <input type="number" value={newRuleScore} onChange={e=>setNewRuleScore(e.target.value)} placeholder="如:90" className="block w-20 p-2 rounded-lg border outline-none font-bold text-sm bg-white" />
+                                                            <input type="number" value={newRuleScore} onChange={e=>setNewRuleScore(e.target.value)} placeholder="如:90" className="p-2 rounded-lg border outline-none font-bold text-sm bg-white w-full min-w-0" />
                                                         </div>
-                                                        <div>
+                                                        <div className="flex flex-col w-full">
                                                             <label className="text-xs font-bold text-indigo-400 block mb-1">累積次數</label>
-                                                            <input type="number" value={newRuleCount} onChange={e=>setNewRuleCount(e.target.value)} placeholder="如:2" className="block w-20 p-2 rounded-lg border outline-none font-bold text-sm bg-white" />
+                                                            <input type="number" value={newRuleCount} onChange={e=>setNewRuleCount(e.target.value)} placeholder="如:2" className="p-2 rounded-lg border outline-none font-bold text-sm bg-white w-full min-w-0" />
                                                         </div>
-                                                        <div className="flex-1 min-w-[150px]">
-                                                            <label className="text-xs font-bold text-indigo-400 block mb-1">可兌換獎勵名稱 (作為預設值)</label>
-                                                            <input type="text" value={newRuleRewardName} onChange={e=>setNewRuleRewardName(e.target.value)} placeholder="如: 樂高玩具" className="block w-full p-2 rounded-lg border outline-none font-bold text-sm bg-white" />
+                                                        <div className="col-span-2 sm:col-span-4 lg:col-span-5 flex flex-col sm:flex-row gap-2 w-full mt-2 lg:mt-0">
+                                                            <div className="flex flex-col flex-1 min-w-0">
+                                                                <label className="text-xs font-bold text-indigo-400 block mb-1 lg:hidden">可兌換獎勵名稱 (作為預設值)</label>
+                                                                <label className="text-xs font-bold text-indigo-400 mb-1 hidden lg:block opacity-0">可兌換獎勵名稱</label>
+                                                                <input type="text" value={newRuleRewardName} onChange={e=>setNewRuleRewardName(e.target.value)} placeholder="預設獎品 (如: 樂高玩具)" className="w-full p-2 rounded-lg border outline-none font-bold text-sm bg-white min-w-0" />
+                                                            </div>
+                                                            <div className="flex flex-col shrink-0">
+                                                                <label className="text-xs font-bold text-indigo-400 mb-1 hidden lg:block opacity-0">新增</label>
+                                                                <button onClick={() => {
+                                                                    if(!newRuleScore || !newRuleCount) return setSystemMsg("❌ 請設定分數與次數！");
+                                                                    const newRule = { id: Date.now().toString(), type: newRuleType, subject: newRuleSubject, minScore: parseInt(newRuleScore), requiredCount: parseInt(newRuleCount), rewardName: newRuleRewardName || '考試獎勵' };
+                                                                    const updated = [...examRules, newRule];
+                                                                    setExamRules(updated); robustSave(STORAGE_KEYS.EXAM_RULES, STORAGE_KEYS.EXAM_RULES+'_bak', updated);
+                                                                    setNewRuleScore(''); setNewRuleCount(''); setNewRuleRewardName('');
+                                                                }} className="bg-indigo-600 text-white h-[38px] px-6 rounded-lg font-bold hover:bg-indigo-700 transition-colors">新增規則</button>
+                                                            </div>
                                                         </div>
-                                                        <button onClick={() => {
-                                                            if(!newRuleScore || !newRuleCount) return;
-                                                            const newRule = { id: Date.now().toString(), type: newRuleType, subject: newRuleSubject, minScore: parseInt(newRuleScore), requiredCount: parseInt(newRuleCount), rewardName: newRuleRewardName || '考試獎勵' };
-                                                            const updated = [...examRules, newRule];
-                                                            setExamRules(updated); robustSave(STORAGE_KEYS.EXAM_RULES, STORAGE_KEYS.EXAM_RULES+'_bak', updated);
-                                                            setNewRuleScore(''); setNewRuleCount(''); setNewRuleRewardName('');
-                                                        }} className="bg-indigo-600 text-white px-4 py-2 rounded-lg font-bold hover:bg-indigo-700">新增規則</button>
                                                     </div>
                                                     <div className="space-y-2">
                                                         {examRules.map(r => {
                                                             const typeName = r.type === '不限' ? '任何考試' : (examTypes.find(t => t.id === r.type)?.name || '未知');
                                                             return (
-                                                                <div key={r.id} className="bg-white p-3 rounded-lg border flex justify-between items-center text-sm font-bold shadow-sm">
-                                                                    <span className="text-slate-600"><span className="text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded mr-1">{typeName}</span> <span className="text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded mr-1">{r.subject === '不限' ? '任何科目' : r.subject}</span> 達 <span className="text-red-500">{r.minScore}</span> 分，累積滿 <span className="text-red-500">{r.requiredCount}</span> 次 ➔ 預設獎品：<span className="text-indigo-600">{r.rewardName}</span></span>
-                                                                    <button onClick={() => { const updated = examRules.filter(er => er.id !== r.id); setExamRules(updated); robustSave(STORAGE_KEYS.EXAM_RULES, STORAGE_KEYS.EXAM_RULES+'_bak', updated); }} className="text-slate-400 hover:text-red-500"><Icon name="Trash2" className="w-4 h-4"/></button>
+                                                                <div key={r.id} className="bg-white p-3 rounded-lg border flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 text-sm font-bold shadow-sm">
+                                                                    <span className="text-slate-600 leading-relaxed"><span className="text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded mr-1 whitespace-nowrap">{typeName}</span> <span className="text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded mr-1 whitespace-nowrap">{r.subject === '不限' ? '任何科目' : r.subject}</span> 達 <span className="text-red-500">{r.minScore}</span> 分，滿 <span className="text-red-500">{r.requiredCount}</span> 次 ➔ 預設獎品：<span className="text-indigo-600">{r.rewardName}</span></span>
+                                                                    <button onClick={() => { const updated = examRules.filter(er => er.id !== r.id); setExamRules(updated); robustSave(STORAGE_KEYS.EXAM_RULES, STORAGE_KEYS.EXAM_RULES+'_bak', updated); }} className="text-slate-400 hover:text-red-500 shrink-0 self-end sm:self-auto bg-slate-50 hover:bg-red-50 p-1.5 rounded-lg border border-slate-200"><Icon name="Trash2" className="w-4 h-4"/></button>
                                                                 </div>
                                                             )
                                                         })}
@@ -2537,37 +2558,41 @@
                                                             return (
                                                                 <div key={e.id} className="bg-white border border-slate-200 p-4 md:p-5 rounded-xl shadow-sm hover:border-yellow-300 transition-colors group">
                                                                     {isEditing ? (
-                                                                        <div className="flex flex-wrap gap-2 items-center bg-yellow-50 p-3 rounded-lg">
-                                                                            <input type="date" value={editExamDate} onChange={ev=>setEditExamDate(ev.target.value)} className="p-1.5 rounded border text-sm font-bold" />
-                                                                            <select value={editExamType} onChange={ev=>setEditExamType(ev.target.value)} className="p-1.5 rounded border text-sm font-bold"><option value="">種類</option>{examTypes.map(t=><option key={t.id} value={t.id}>{t.name}</option>)}</select>
-                                                                            <select value={editExamSubject} onChange={ev=>setEditExamSubject(ev.target.value)} className="p-1.5 rounded border text-sm font-bold"><option value="">科目</option>{examSubjects.map(s=><option key={s.id} value={s.name}>{s.name}</option>)}</select>
-                                                                            <input type="text" value={editExamUnit} onChange={ev=>setEditExamUnit(ev.target.value)} placeholder="單元/範圍" className="p-1.5 w-24 rounded border text-sm font-bold" />
-                                                                            <input type="number" value={editExamScore} onChange={ev=>setEditExamScore(ev.target.value)} className="p-1.5 w-16 rounded border text-sm font-bold text-center" />
-                                                                            <button onClick={() => {
-                                                                                let scoreNum = parseInt(editExamScore, 10); if(isNaN(scoreNum)) scoreNum=0;
-                                                                                const updated = exams.map(ex => ex.id === e.id ? {...ex, dateStr: editExamDate, type: editExamType, subject: editExamSubject, unit: editExamUnit, score: scoreNum} : ex);
-                                                                                setExams(updated); robustSave(STORAGE_KEYS.EXAMS, STORAGE_KEYS.EXAMS+'_bak', updated); setEditingExamId(null);
-                                                                            }} className="bg-indigo-500 text-white px-3 py-1.5 rounded text-sm font-bold ml-auto">儲存</button>
-                                                                            <button onClick={() => setEditingExamId(null)} className="bg-slate-200 text-slate-600 px-3 py-1.5 rounded text-sm font-bold">取消</button>
+                                                                        <div className="flex flex-col sm:flex-row flex-wrap gap-2 items-start sm:items-center bg-yellow-50 p-3 rounded-lg w-full">
+                                                                            <input type="date" value={editExamDate} onChange={ev=>setEditExamDate(ev.target.value)} className="p-2 rounded border text-sm font-bold flex-1 min-w-[140px] w-full sm:w-auto outline-none focus:border-yellow-400" />
+                                                                            <select value={editExamType} onChange={ev=>setEditExamType(ev.target.value)} className="p-2 rounded border text-sm font-bold flex-1 min-w-[100px] w-full sm:w-auto outline-none focus:border-yellow-400"><option value="">種類</option>{examTypes.map(t=><option key={t.id} value={t.id}>{t.name}</option>)}</select>
+                                                                            <select value={editExamSubject} onChange={ev=>setEditExamSubject(ev.target.value)} className="p-2 rounded border text-sm font-bold flex-1 min-w-[100px] w-full sm:w-auto outline-none focus:border-yellow-400"><option value="">科目</option>{examSubjects.map(s=><option key={s.id} value={s.name}>{s.name}</option>)}</select>
+                                                                            <div className="flex gap-2 w-full sm:w-auto flex-1 min-w-[150px]">
+                                                                                <input type="text" value={editExamUnit} onChange={ev=>setEditExamUnit(ev.target.value)} placeholder="單元/範圍" className="p-2 w-full rounded border text-sm font-bold min-w-0 outline-none focus:border-yellow-400" />
+                                                                                <input type="number" value={editExamScore} onChange={ev=>setEditExamScore(ev.target.value)} placeholder="分數" className="p-2 w-20 rounded border text-sm font-bold text-center shrink-0 outline-none focus:border-yellow-400" />
+                                                                            </div>
+                                                                            <div className="flex gap-2 w-full sm:w-auto sm:ml-auto mt-2 sm:mt-0">
+                                                                                <button onClick={() => {
+                                                                                    let scoreNum = parseInt(editExamScore, 10); if(isNaN(scoreNum)) scoreNum=0;
+                                                                                    const updated = exams.map(ex => ex.id === e.id ? {...ex, dateStr: editExamDate, type: editExamType, subject: editExamSubject, unit: editExamUnit, score: scoreNum} : ex);
+                                                                                    setExams(updated); robustSave(STORAGE_KEYS.EXAMS, STORAGE_KEYS.EXAMS+'_bak', updated); setEditingExamId(null);
+                                                                                }} className="flex-1 sm:flex-none bg-indigo-500 text-white px-4 py-2 rounded-lg text-sm font-bold">儲存</button>
+                                                                                <button onClick={() => setEditingExamId(null)} className="flex-1 sm:flex-none bg-slate-200 text-slate-600 px-4 py-2 rounded-lg text-sm font-bold">取消</button>
+                                                                            </div>
                                                                         </div>
                                                                     ) : (
-                                                                        <div className="flex items-center justify-between">
-                                                                            <div className="flex items-center gap-4">
-                                                                                <div className={`w-12 h-12 rounded-full flex items-center justify-center border-2 shrink-0 ${e.score >= 90 ? 'bg-red-50 border-red-200 text-red-500' : 'bg-yellow-50 border-yellow-200 text-yellow-600'}`}>
-                                                                                    <Icon name="Award" className="w-6 h-6" />
+                                                                        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 w-full">
+                                                                            <div className="flex items-center gap-3 w-full sm:w-auto min-w-0 flex-1">
+                                                                                <div className={`w-10 h-10 md:w-12 md:h-12 rounded-full flex items-center justify-center border-2 shrink-0 ${e.score >= 90 ? 'bg-red-50 border-red-200 text-red-500' : 'bg-yellow-50 border-yellow-200 text-yellow-600'}`}>
+                                                                                    <Icon name="Award" className="w-5 h-5 md:w-6 md:h-6" />
                                                                                 </div>
-                                                                                <div>
-                                                                                    <div className="flex items-center gap-2 mb-1">
-                                                                                        <span className="text-[10px] bg-slate-100 text-slate-500 px-2 py-0.5 rounded font-bold">{typeName}</span>
-                                                                                        {e.unit && <span className="text-[10px] bg-indigo-50 text-indigo-500 border border-indigo-100 px-2 py-0.5 rounded font-bold">{e.unit}</span>}
+                                                                                <div className="flex-1 min-w-0">
+                                                                                    <div className="flex flex-wrap items-center gap-1.5 mb-1">
+                                                                                        <span className="text-[10px] bg-slate-100 text-slate-500 px-2 py-0.5 rounded font-bold truncate max-w-full">{typeName}</span>
+                                                                                        {e.unit && <span className="text-[10px] bg-indigo-50 text-indigo-500 border border-indigo-100 px-2 py-0.5 rounded font-bold truncate max-w-full">{e.unit}</span>}
                                                                                     </div>
-                                                                                    <p className="font-black text-slate-800 text-lg flex items-baseline gap-2">
-                                                                                        {e.subject} <span className={`text-2xl ${e.score >= 90 ? 'text-red-500' : 'text-yellow-600'}`}>{e.score}分</span>
+                                                                                    <p className="font-black text-slate-800 text-base md:text-lg flex flex-wrap items-baseline gap-1.5 truncate">
+                                                                                        <span className="truncate">{e.subject}</span> <span className={`text-xl md:text-2xl shrink-0 ${e.score >= 90 ? 'text-red-500' : 'text-yellow-600'}`}>{e.score}分</span>
                                                                                     </p>
-                                                                                    <p className="text-xs text-slate-400 font-bold flex items-center gap-1 mt-1"><Icon name="Calendar" className="w-3 h-3"/> 考試日期：{e.dateStr}</p>
+                                                                                    <p className="text-xs text-slate-400 font-bold flex items-center gap-1 mt-1 truncate"><Icon name="Calendar" className="w-3 h-3 shrink-0"/> 考試日期：{e.dateStr}</p>
                                                                                 </div>
                                                                             </div>
-                                                                            <div className="flex gap-1 opacity-100 transition-opacity">
+                                                                            <div className="flex gap-1 w-full sm:w-auto justify-end shrink-0 opacity-100 transition-opacity mt-2 sm:mt-0">
                                                                                 <button onClick={() => {setEditingExamId(e.id); setEditExamDate(e.dateStr); setEditExamType(e.type); setEditExamSubject(e.subject); setEditExamUnit(e.unit || ''); setEditExamScore(e.score);}} className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors bg-slate-50 border border-slate-200 shadow-sm"><Icon name="Edit2" className="w-4 h-4" /></button>
                                                                                 <button onClick={() => setExamToDelete(e)} className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors bg-slate-50 border border-slate-200 shadow-sm"><Icon name="Trash2" className="w-4 h-4" /></button>
                                                                             </div>
@@ -2638,9 +2663,9 @@
                                                                             value={pendingRewardsInputs[reward.periodId] !== undefined ? pendingRewardsInputs[reward.periodId] : (reward.defaultRewardName || '')}
                                                                             onChange={(e) => setPendingRewardsInputs(prev => ({...prev, [reward.periodId]: e.target.value}))}
                                                                             onKeyDown={(e) => e.key === 'Enter' && handleClaimReward(reward)}
-                                                                            className="flex-1 px-3 py-2 rounded-lg border border-slate-300 outline-none focus:ring-2 focus:ring-indigo-300 font-bold"
+                                                                            className="flex-1 px-3 py-2 rounded-lg border border-slate-300 outline-none focus:ring-2 focus:ring-indigo-300 font-bold min-w-0 w-full"
                                                                         />
-                                                                        <button onClick={() => handleClaimReward(reward)} className={`text-white px-4 py-2 rounded-lg font-black shadow-sm shrink-0 ${reward.type === 'monthly' ? 'bg-orange-500 hover:bg-orange-600' : reward.type === 'exam' ? 'bg-indigo-500 hover:bg-indigo-600' : 'bg-emerald-500 hover:bg-emerald-600'}`}>記錄已兌換</button>
+                                                                        <button onClick={() => handleClaimReward(reward)} className={`text-white px-4 py-2 rounded-lg font-black shadow-sm shrink-0 w-full md:w-auto ${reward.type === 'monthly' ? 'bg-orange-500 hover:bg-orange-600' : reward.type === 'exam' ? 'bg-indigo-500 hover:bg-indigo-600' : 'bg-emerald-500 hover:bg-emerald-600'}`}>記錄已兌換</button>
                                                                     </div>
                                                                 </div>
                                                             ))}
@@ -2666,30 +2691,34 @@
                                                                             <div className={`w-10 h-10 md:w-12 md:h-12 rounded-full flex items-center justify-center shrink-0 shadow-inner border-2 ${!isValid ? 'bg-red-50 text-red-500 border-red-100' : reward.type === 'monthly' ? 'bg-orange-50 text-orange-500 border-orange-100' : reward.type === 'exam' ? 'bg-indigo-50 text-indigo-500 border-indigo-100' : 'bg-emerald-50 text-emerald-500 border-emerald-100'}`}>
                                                                                 {!isValid ? <Icon name="AlertTriangle" className="w-5 h-5 md:w-6 md:h-6" /> : <Icon name={reward.type === 'monthly' ? 'Crown' : reward.type === 'exam' ? 'Award' : 'Gift'} className="w-5 h-5 md:w-6 md:h-6" />}
                                                                             </div>
-                                                                            <div className="flex-1 overflow-hidden">
+                                                                            <div className="flex-1 min-w-0 overflow-hidden">
                                                                                 {isEditing ? (
-                                                                                    <div className="flex items-center gap-2 mb-1">
+                                                                                    <div className="flex flex-wrap items-center gap-2 mb-1">
                                                                                         <input 
                                                                                             type="text" 
                                                                                             value={editRewardTitle} 
                                                                                             onChange={e => setEditRewardTitle(e.target.value)} 
-                                                                                            className="flex-1 px-2 py-1 border border-indigo-300 rounded outline-none focus:ring-2 focus:ring-indigo-400 font-bold text-slate-800 text-sm md:text-base"
+                                                                                            className="flex-1 px-2 py-1.5 border border-indigo-300 rounded outline-none focus:ring-2 focus:ring-indigo-400 font-bold text-slate-800 text-sm min-w-[120px]"
                                                                                             autoFocus
                                                                                             onKeyDown={e => e.key === 'Enter' && saveEditReward()}
                                                                                         />
-                                                                                        <button onClick={saveEditReward} className="bg-indigo-600 text-white px-3 py-1 rounded shadow-sm text-xs font-bold shrink-0">儲存</button>
-                                                                                        <button onClick={() => setEditingRewardId(null)} className="bg-slate-200 text-slate-600 px-3 py-1 rounded text-xs font-bold shrink-0">取消</button>
+                                                                                        <div className="flex gap-1 shrink-0 w-full sm:w-auto justify-end">
+                                                                                            <button onClick={saveEditReward} className="bg-indigo-600 text-white px-3 py-1.5 rounded shadow-sm text-xs font-bold shrink-0">儲存</button>
+                                                                                            <button onClick={() => setEditingRewardId(null)} className="bg-slate-200 text-slate-600 px-3 py-1.5 rounded text-xs font-bold shrink-0">取消</button>
+                                                                                        </div>
                                                                                     </div>
                                                                                 ) : (
-                                                                                    <div className="flex flex-col md:flex-row md:items-center gap-1 md:gap-2 mb-0.5">
-                                                                                        <p className={`font-black text-base md:text-lg leading-tight truncate ${!isValid ? 'text-red-700 line-through opacity-70' : 'text-slate-800'}`}>{reward.title}</p>
-                                                                                        <span className={`text-[10px] px-2 py-0.5 rounded border font-bold inline-block w-max shrink-0 ${!isValid ? 'bg-red-100 text-red-600 border-red-200' : reward.type === 'monthly' ? 'bg-orange-100 text-orange-600 border-orange-200' : reward.type === 'exam' ? 'bg-indigo-100 text-indigo-600 border-indigo-200' : 'bg-emerald-100 text-emerald-600 border-emerald-200'}`}>
-                                                                                            {reward.periodLabel}
-                                                                                        </span>
-                                                                                    </div>
+                                                                                    <>
+                                                                                        <div className="flex flex-wrap md:items-center gap-1.5 md:gap-2 mb-0.5">
+                                                                                            <p className={`font-black text-base md:text-lg leading-tight truncate max-w-full ${!isValid ? 'text-red-700 line-through opacity-70' : 'text-slate-800'}`}>{reward.title}</p>
+                                                                                            <span className={`text-[10px] px-2 py-0.5 rounded border font-bold inline-block shrink-0 ${!isValid ? 'bg-red-100 text-red-600 border-red-200' : reward.type === 'monthly' ? 'bg-orange-100 text-orange-600 border-orange-200' : reward.type === 'exam' ? 'bg-indigo-100 text-indigo-600 border-indigo-200' : 'bg-emerald-100 text-emerald-600 border-emerald-200'}`}>
+                                                                                                {reward.periodLabel}
+                                                                                            </span>
+                                                                                        </div>
+                                                                                        <p className="text-xs text-slate-400 font-bold flex items-center gap-1 truncate"><Icon name="Calendar" className="w-3 h-3 shrink-0"/> 兌換日期：{reward.date}</p>
+                                                                                        {!isValid && <p className="text-[10px] md:text-xs text-red-500 font-bold mt-1 animate-pulse flex items-center gap-1"><Icon name="AlertTriangle" className="w-3 h-3 shrink-0"/> 警告：該週期成績/紀錄已異動，達標失效！</p>}
+                                                                                    </>
                                                                                 )}
-                                                                                {!isEditing && <p className="text-xs text-slate-400 font-bold flex items-center gap-1 truncate"><Icon name="Calendar" className="w-3 h-3 shrink-0"/> 兌換日期：{reward.date}</p>}
-                                                                                {!isValid && !isEditing && <p className="text-[10px] md:text-xs text-red-500 font-bold mt-1 animate-pulse flex items-center gap-1"><Icon name="AlertTriangle" className="w-3 h-3 shrink-0"/> 警告：該週期成績/紀錄已異動，達標失效！</p>}
                                                                             </div>
                                                                         </div>
                                                                     </div>
@@ -2726,8 +2755,8 @@
                                                         <div className="bg-slate-700/50 p-4 rounded-xl border border-slate-600">
                                                             <h4 className="text-sm font-bold text-indigo-300 mb-3">安全鎖定設定</h4>
                                                             <div className="flex flex-col sm:flex-row items-center gap-2 mb-3">
-                                                                <input type="password" value={settingOldPin} onChange={e=>setSettingOldPin(e.target.value.replace(/\D/g,'').slice(0,4))} placeholder="輸入舊密碼" className="w-full bg-slate-800 border border-slate-600 text-white font-bold rounded-lg px-3 py-2 outline-none focus:border-indigo-400 text-center tracking-widest min-w-0" />
-                                                                <input type="password" value={settingNewPin} onChange={e=>setSettingNewPin(e.target.value.replace(/\D/g,'').slice(0,4))} placeholder="設定 4 位新密碼" className="w-full bg-slate-800 border border-slate-600 text-white font-bold rounded-lg px-3 py-2 outline-none focus:border-indigo-400 text-center tracking-widest min-w-0" />
+                                                                <input type="password" value={settingOldPin} onChange={e=>setSettingOldPin(e.target.value.replace(/\D/g,'').slice(0,4))} placeholder="輸入舊密碼" className="w-full sm:flex-1 bg-slate-800 border border-slate-600 text-white font-bold rounded-lg px-3 py-2 outline-none focus:border-indigo-400 text-center tracking-widest min-w-0" />
+                                                                <input type="password" value={settingNewPin} onChange={e=>setSettingNewPin(e.target.value.replace(/\D/g,'').slice(0,4))} placeholder="設定 4 位新密碼" className="w-full sm:flex-1 bg-slate-800 border border-slate-600 text-white font-bold rounded-lg px-3 py-2 outline-none focus:border-indigo-400 text-center tracking-widest min-w-0" />
                                                             </div>
                                                             <button onClick={() => {
                                                                 const currentPin = localStorage.getItem(STORAGE_KEYS.PARENT_PIN) || '0000';
@@ -2754,6 +2783,19 @@
                                                             </div>
                                                             <p className="text-[10px] text-slate-400 mt-4 leading-relaxed bg-slate-800 p-2 rounded-lg border border-slate-600/50">
                                                                 <strong className="text-orange-400">強烈建議：</strong>每月定期匯出資料保存至電腦或雲端硬碟。若更換設備或清除瀏覽器紀錄，可隨時「從檔案還原」救回所有設定與作息紀錄。
+                                                            </p>
+                                                        </div>
+                                                        <div className="bg-slate-700/50 p-4 rounded-xl border border-slate-600 flex flex-col justify-center mt-2 md:col-span-2">
+                                                            <h4 className="text-sm font-bold text-indigo-300 mb-3">AI 辨識金鑰 (API Key) 設定</h4>
+                                                            <div className="flex flex-col sm:flex-row items-center gap-2 mb-2">
+                                                                <input type="password" value={systemApiKey} onChange={e=>setSystemApiKey(e.target.value)} placeholder="輸入 Google AI Studio API Key" className="flex-1 w-full bg-slate-800 border border-slate-600 text-white font-bold rounded-lg px-3 py-2 outline-none focus:border-indigo-400 min-w-0" />
+                                                                <button onClick={() => {
+                                                                    localStorage.setItem('yang_api_key', systemApiKey.trim());
+                                                                    setSystemMsg("✅ API Key 儲存成功！現在可以使用 AI 拍照辨識功能了。");
+                                                                }} className="w-full sm:w-auto bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-lg font-bold text-sm transition-colors whitespace-nowrap shrink-0">儲存金鑰</button>
+                                                            </div>
+                                                            <p className="text-[10px] text-slate-400 leading-relaxed">
+                                                                ※ 您的金鑰只會儲存在這台裝置的瀏覽器中。這可以避免將金鑰寫在 GitHub 程式碼中導致被 Google 判定外洩並停用 (HTTP 403 錯誤)。
                                                             </p>
                                                         </div>
                                                     </div>
